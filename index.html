@@ -87,20 +87,6 @@
   .menu-btn{position:relative;display:block;font-family:var(--display);font-size:clamp(32px,4.6vw,60px);letter-spacing:.04em;line-height:1;padding:.14em .2em .04em .15em;color:var(--bone);-webkit-text-stroke:.09em var(--ink);paint-order:stroke fill;text-shadow:0 .07em 0 var(--ink);transition:transform .28s cubic-bezier(.3,1.6,.5,1),color .18s}
   .menu-btn::before{content:"";position:absolute;left:-.5em;top:50%;border-left:.36em solid var(--orange);border-top:.22em solid transparent;border-bottom:.22em solid transparent;transform:translateY(-50%) scale(0);transition:transform .22s cubic-bezier(.3,1.6,.5,1);filter:drop-shadow(0 2px 0 var(--ink))}
   .menu-btn:hover,.menu-btn:focus-visible{color:var(--orange);transform:translateX(.4em) rotate(-1.5deg)}
-  .mp{margin:clamp(6px,1.6vh,14px) 0 0 .15em;display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:min(86vw,440px)}
-  .mp-box{display:flex;align-items:center;width:100%;background:rgba(10,7,5,.72);border:2px solid #4a3527;border-radius:12px;box-shadow:0 4px 0 var(--ink);overflow:hidden}
-  .mp-box input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--bone);font:600 15px/1.2 var(--text);letter-spacing:.02em;padding:12px 12px;-webkit-user-select:text;user-select:text}
-  .mp-box input::placeholder{color:#8d847a}
-  .mp-box button{flex:none;font-family:var(--display);font-size:16px;letter-spacing:.05em;color:var(--ink);background:var(--teal);padding:12px 14px 9px;border-left:2px solid #4a3527}
-  .mp-box button[hidden]{display:none}
-  .mp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .mp-gen,.mp-join,.mp-follow{font-family:var(--display);font-size:clamp(18px,2.2vw,22px);letter-spacing:.05em;color:var(--ink);background:var(--orange);border-radius:999px;padding:.5em 1em .32em;box-shadow:0 4px 0 var(--ink);transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
-  .mp-gen:active,.mp-join:active,.mp-follow:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
-  .mp-join{background:var(--teal)}
-  .mp-follow{background:#c3a6ff}
-  .mp-join[hidden],.mp-follow[hidden]{display:none}
-  .mp-status{font-size:13px;letter-spacing:.06em;color:#b9ada0;line-height:1.35;max-width:100%;text-shadow:0 1px 0 #000}
-  .mp-status b{color:var(--bone);font-weight:700}
   .menu-btn:hover::before,.menu-btn:focus-visible::before{transform:translateY(-50%) scale(1)}
   .menu-btn:active{transform:translateX(.4em) scale(.95)}
 
@@ -224,11 +210,6 @@
       <nav>
         <div class="item" style="--i:0"><button class="menu-btn" data-go="chapters">PLAY</button></div>
         <div class="item" style="--i:1"><button class="menu-btn" data-go="settings">SETTINGS</button></div>
-        <div class="item" style="--i:2"><div class="mp" aria-label="Multiplayer">
-          <div class="mp-box"><input id="mpLink" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Play with a friend: generate a code, or paste their link" aria-label="Multiplayer link"><button id="mpCopy" type="button" hidden>COPY</button></div>
-          <div class="mp-row"><button class="mp-gen" id="mpGen" type="button">GENERATE CODE</button><button class="mp-join" id="mpJoin" type="button" hidden>JOIN</button><button class="mp-follow" id="mpFollow" type="button" hidden></button></div>
-          <p class="mp-status" id="mpStatus"></p>
-        </div></div>
       </nav>
     </section>
 
@@ -429,11 +410,6 @@
     if (started) return; started = true;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
     getAC();
-    // unlock every chapter's sounds inside this first tap, so a friend can bring you into a chapter later and you still hear it
-    for (const el of [voice, $('#borrowed'), $('#ride'), $('#buckle'), $('#mines'), $('#croak'), $('#hand'), $('#senengeon')]) {
-      try { const p = el.play(); el.pause(); el.currentTime = 0; if (p && p.catch) p.catch(() => {}); } catch (e) {}
-    }
-    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
     fade = 0; applyMusic(); playMusic();   // must start inside the tap so phones allow it
     blackout.classList.add('tapped');
     await wait(700);
@@ -442,7 +418,6 @@
     fadeIn(3500);
     await wait(2600); stage.classList.add('title-in');
     await wait(1200); stage.classList.add('menu-in');
-    mpAutoFollow();
   }
   blackout.addEventListener('click', begin);
   blackout.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); begin(); } });
@@ -519,14 +494,9 @@
     2: 'Models: <a href="https://sketchfab.com/3d-models/hellish-banban-rigged-c65f6cbd26d24ac6a11511bca18cab83" target="_blank" rel="noopener">\u201cHellish Banban Rigged\u201d</a> and <a href="https://sketchfab.com/3d-models/sheriff-toadster-rigged-official-297ae0f93278413298f4f8c5b8811dbd" target="_blank" rel="noopener">\u201cSheriff Toadster Rigged Official\u201d</a> by nnneagu (simplified &amp; animated) \u00b7 <a href="https://sketchfab.com/3d-models/garten-of-banban-7-syringeon-5ff243faee14410888f72bd646ae5d75" target="_blank" rel="noopener">\u201cGarten of Banban 7 - Syringeon\u201d</a> and <a href="https://sketchfab.com/3d-models/naughtyones-garten-of-banban-6-fanmade-anims-f0c4120365064f2fad9935234f8a4d92" target="_blank" rel="noopener">\u201cNaughtyOnes - Garten of Banban 6\u201d</a> by nnneagu (simplified) \u00b7 <a href="https://sketchfab.com/3d-models/rope-knots-aa6380f3e5d442b1a1971d4cb1c88ccb" target="_blank" rel="noopener">\u201cRope Knots\u201d</a> by aneeqayounas \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>'
   };
   async function enterChapter1(){ return enterChapter(1); }
-  async function enterChapter(n, L){
+  async function enterChapter(n){
     if (inChapter) return;
     inChapter = true; leaving = false;
-    // playing together: join the friend who is already in this chapter, otherwise you lead and your friends are brought along
-    if (!L && MP.named) { const cur = newestLeader(); if (cur && cur.ch === n) L = cur; }
-    if (L && MP.named) { MP.role = 'guest'; MP.leadKey = L.key; MP.leadAt = L.ld; }
-    else { MP.role = 'lead'; MP.myLd = serverNow(); }
-    mpSetChapter(n);
     $('#credit1').innerHTML = CREDITS[n];
     // unlock the chapter's sounds inside this tap so they may play later on phones
     const unlock = n === 1 ? [voice, $('#borrowed'), $('#ride'), $('#buckle'), $('#mines')] : n === 2 ? [$('#croak'), $('#hand'), $('#senengeon')] : [$('#borrowed')];
@@ -555,12 +525,12 @@
     try {
       if (n === 3) scene = await window.Chapter3.start({
         canvas, container: sceneEl, mimicker: window.MIMICKER_DATA, getSleeper: k => window[SLEEPER_VARS[k]] || null,
-        audio: { borrowed: $('#borrowed') }, musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music, mp: mpLink(3),
+        audio: { borrowed: $('#borrowed') }, musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music,
         getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(3)
       });
       else if (n === 2) scene = await window.Chapter2.start({
         canvas, container: sceneEl, banban: window.BANBAN_DATA, getToad: () => window.TOAD_DATA || null,
-        audio: { croak: $('#croak'), hand: $('#hand'), seneng: $('#senengeon') }, envHand: HAND_ENV, mp: mpLink(2),
+        audio: { croak: $('#croak'), hand: $('#hand'), seneng: $('#senengeon') }, envHand: HAND_ENV,
         getSyr: () => window.SYRINGEON_DATA || null, getNaughty: () => window.NAUGHTY_DATA || null, getRope: () => window.ROPE_DATA || null,
         musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music, canDuck: () => volOK,
         getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(2)
@@ -568,7 +538,7 @@
       else scene = await window.Chapter1.start({
         canvas, container: sceneEl, meta: data.meta, bin: data.bin, envelope: VOICE_ENV, envBuckle: BUCKLE_ENV, envMines: MINES_ENV,
         audio: { voice, borrowed: $('#borrowed'), buckle: $('#buckle'), mines: $('#mines'), ride: $('#ride'), wheels: music },
-        getClaw: () => window.CLAW_DATA || null, mp: mpLink(1),
+        getClaw: () => window.CLAW_DATA || null,
         musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music,
         getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(1),
         onVoiceBlocked: () => sceneMessage('Tap to hear it', '🔊 Play', () => { sceneMessage(''); voice.play().catch(() => {}); }),
@@ -590,13 +560,9 @@
     setTimeout(() => sceneHint.classList.add('show'), 2600);
     setTimeout(() => sceneHint.classList.remove('show'), 7600);
   }
-  async function exitChapter(reason){
+  async function exitChapter(){
     if (!inChapter || leaving) return;
-    leaving = true;
-    if (typeof reason !== 'string') reason = '';   // from a button: the player chose to leave
-    const next = reason === 'next';
-    if (MP.role === 'guest' && !reason) MP.declined = MP.leadAt;   // you chose to leave your friend's game: don't pull you back in
-    if (!next) sfx('back');
+    leaving = true; sfx('back');
     fadeEl.classList.remove('slow'); fadeEl.classList.add('on');
     await wait(1250);
     if (scene) { scene.stop(); scene = null; window.__scene = null; }
@@ -604,13 +570,12 @@
     const ride = $('#ride'), ridePos = ride.paused ? -1 : ride.currentTime;
     for (const el of [voice, $('#borrowed'), $('#buckle'), $('#mines'), ride, $('#croak'), $('#hand'), $('#senengeon')]) { try { el.pause(); el.currentTime = 0; } catch (e) {} }
     try { speechSynthesis.cancel(); } catch (e) {}
-    if (ridePos >= 0 && S.music && !next) { try { music.currentTime = ridePos; } catch (e) {} fade = 1; applyMusic(); playMusic(); }
+    if (ridePos >= 0 && S.music) { try { music.currentTime = ridePos; } catch (e) {} fade = 1; applyMusic(); playMusic(); }
     sceneEl.querySelectorAll('canvas').forEach(c => c.remove());
     sceneEl.classList.remove('on'); sceneHint.classList.remove('show'); sceneMessage('');
     stage.style.visibility = '';
-    inChapter = false; MP.role = 'solo'; mpSetChapter(0);
+    inChapter = false;
     show('menu');
-    if (next) { leaving = false; return; }                  // going straight into a friend's chapter: stay dark
     if (!music.paused) { fade = 1; applyMusic(); }          // Wheels of Freedom is already playing from the ride
     else if (S.music) { fade = 0; applyMusic(); playMusic(); fadeIn(2500); }
     fadeEl.classList.add('slow'); fadeEl.classList.remove('on');
@@ -645,269 +610,6 @@
     sfx('select'); ch3.classList.remove('pressed'); void ch3.offsetWidth; ch3.classList.add('pressed'); enterChapter(3);
   });
   document.querySelectorAll('.card[data-ch]').forEach(c => c.addEventListener('click', () => lockedShake(c)));
-
-  /* ---------- multiplayer: a named room per code, players share where they are via presence ---------- */
-  const ART_URL = 'https://claude.ai/artifact/3ZKAVf1QdznvuedoTvYBHn';
-  // On its own website the game uses Firebase for multiplayer; the deploy step fills this in.
-  const FIREBASE_CONFIG = {"apiKey": "AIzaSyBB7nKujGimy5ys3SU-X8Be9N_KSXDaPbA", "authDomain": "escape-the-prison-d6364.firebaseapp.com", "databaseURL": "https://escape-the-prison-d6364-default-rtdb.firebaseio.com", "projectId": "escape-the-prison-d6364", "storageBucket": "escape-the-prison-d6364.firebasestorage.app", "messagingSenderId": "23101186857", "appId": "1:23101186857:web:48f72f62cc26552c22cd38"};
-  const ON_CLAUDE = /claude|anthropic/.test(location.hostname);
-  const SITE_URL = (!ON_CLAUDE && /^https?:$/.test(location.protocol)) ? location.origin + location.pathname : ART_URL;
-  const COLOR_NAMES = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange'];
-  const mpEl = { link: $('#mpLink'), copy: $('#mpCopy'), gen: $('#mpGen'), join: $('#mpJoin'), follow: $('#mpFollow'), status: $('#mpStatus') };
-  const MP = { room: null, user: null, tried: false, named: null, code: null, others: [], names: {}, me: { ch: 0 }, last: null, lastT: 0, color: Math.floor(Math.random() * 6), current: 0,
-    role: 'solo', leadKey: null, leadAt: 0, myLd: 0, declined: 0, frames: [], lastW: '', acts: [], meKey: null, switching: false, statusHtml: '' };
-  const codeOf = text => { const m = String(text || '').toLowerCase().match(/(?:#mp-|\b)([a-z0-9]{6})\b/); return m ? m[1] : null; };
-  const linkFor = code => (FIREBASE_CONFIG ? SITE_URL : ART_URL) + '#mp-' + code;
-  function mpStatus(html){ if (html === MP.statusHtml) return; MP.statusHtml = html; mpEl.status.innerHTML = html; }
-  // ---- Firebase transport: rooms/<name>/players/<id> = that player's state; removed when they leave ----
-  let fbP = null;
-  function loadFirebase(){
-    if (window.firebase && window.firebase.database) return Promise.resolve(window.firebase);
-    if (!fbP) {
-      const V = '10.12.2';
-      fbP = loadScript('https://www.gstatic.com/firebasejs/' + V + '/firebase-app-compat.js', () => !!window.firebase)
-        .then(() => loadScript('https://www.gstatic.com/firebasejs/' + V + '/firebase-database-compat.js', () => !!(window.firebase && window.firebase.database)))
-        .then(() => window.firebase);
-      fbP.catch(() => { fbP = null; });
-    }
-    return fbP;
-  }
-  function firebaseRoom(fb){
-    if (!fb.apps.length) fb.initializeApp(FIREBASE_CONFIG);
-    const db = fb.database(); let offset = 0;
-    try { db.ref('.info/serverTimeOffset').on('value', s => { offset = s.val() || 0; }); } catch (e) {}
-    const pid = Math.random().toString(36).slice(2, 12), TS = fb.database.ServerValue.TIMESTAMP;
-    return {
-      now: () => Date.now() + offset,
-      async join(name){
-        const ref = db.ref('rooms/' + name + '/players'), meRef = ref.child(pid), all = {};
-        let mine = {}, dirty = {}, full = true, subs = [], errCbs = [], peers = [], hb = 0, writeT = 0, queued = false, left = false;
-        try { await meRef.onDisconnect().remove(); } catch (e) {}
-        // the first write (and any after a reconnect) sends everything; after that only what changed
-        const write = () => {
-          if (left) return; writeT = Date.now(); queued = false;
-          if (full) { full = false; dirty = {}; meRef.set(Object.assign({}, mine, { ts: TS })).catch(() => { full = true; }); return; }
-          const up = { ts: TS }; for (const k in dirty) up[k] = k in mine ? mine[k] : null; dirty = {};
-          meRef.update(up).catch(() => { full = true; });
-        };
-        const emit = () => {
-          const now = Date.now() + offset;
-          peers = Object.keys(all).filter(k => k === pid || !all[k].ts || now - all[k].ts < 25000).map(k => ({ peer: k, by: null, isMe: k === pid, sameTab: k === pid, kind: 'viewer', guest: false, presence: all[k] }));
-          for (const f of subs) f({ peers, joined: [], left: [], updated: [] });
-        };
-        const onErr = err => { for (const e of errCbs) e({ code: 'upstream_error', message: String(err && err.message || err) }); };
-        const put = s => { all[s.key] = s.val() || {}; emit(); };
-        const rem = s => { delete all[s.key]; if (s.key === pid && !left) { full = true; write(); } emit(); };
-        ref.on('child_added', put, onErr); ref.on('child_changed', put, onErr); ref.on('child_removed', rem, onErr);
-        const conn = s => { if (s.val() && !left) { meRef.onDisconnect().remove().catch(() => {}); full = true; write(); } };
-        try { db.ref('.info/connected').on('value', conn); } catch (e) {}
-        hb = setInterval(() => { write(); emit(); }, 6000);
-        return {
-          name, me: pid,
-          presence(patch){
-            for (const k in patch) {
-              const v = patch[k];
-              if (v === null || v === undefined) { if (k in mine) { delete mine[k]; dirty[k] = 1; } }
-              else if (typeof v === 'object' || mine[k] !== v) { mine[k] = v; dirty[k] = 1; }
-            }
-            const gap = Date.now() - writeT;
-            if (gap >= 90) write(); else if (!queued) { queued = true; setTimeout(write, 90 - gap); }
-            return Promise.resolve();
-          },
-          onPeers(fn, onErr){ subs.push(fn); if (onErr) errCbs.push(onErr); setTimeout(() => fn({ peers, joined: peers, left: [], updated: [] }), 0); return () => { subs = subs.filter(f => f !== fn); }; },
-          peers: () => peers,
-          async leave(){
-            left = true; clearInterval(hb);
-            ref.off('child_added', put); ref.off('child_changed', put); ref.off('child_removed', rem);
-            try { db.ref('.info/connected').off('value', conn); } catch (e) {}
-            try { await meRef.onDisconnect().cancel(); } catch (e) {}
-            try { await meRef.remove(); } catch (e) {}
-          }
-        };
-      }
-    };
-  }
-  function mpConnect(){
-    if (MP.room) return Promise.resolve(MP.room);
-    return (async () => {
-      if (FIREBASE_CONFIG) {
-        try { MP.room = firebaseRoom(await loadFirebase()); MP.via = 'firebase'; } catch (e) { MP.room = null; MP.why = 'firebase-load'; }
-        return MP.room;
-      }
-      // on claude.ai: the page's own room capability (only for signed-in, invited viewers)
-      for (let i = 0; i < 25 && !(window.claude && window.claude.use); i++) await wait(200);
-      if (!(window.claude && window.claude.use)) { MP.why = 'no-runtime'; return null; }
-      try { MP.user = await window.claude.use('user'); } catch (e) { MP.user = null; }
-      try { MP.room = await window.claude.use('room'); } catch (e) { MP.room = null; }
-      if (!MP.room) MP.why = 'room-unavailable'; else MP.via = 'claude';
-      return MP.room;
-    })();
-  }
-  function nameOf(peer, i){
-    const q = peer.presence || {};
-    const n = (peer.by && MP.names[peer.by]) || (typeof q.nm === 'string' && q.nm.slice(0, 24));
-    return n || ('Player ' + (i + 2));
-  }
-  async function resolveNames(){
-    if (!MP.user || !MP.user.profiles) return;
-    const ids = MP.others.map(p => p.by).filter(id => id && !(id in MP.names));
-    if (!ids.length) return;
-    try { const ps = await MP.user.profiles(ids); for (const id of ids) MP.names[id] = (ps && ps[id] && ps[id].name) || ''; renderMp(); } catch (e) {}
-  }
-  function renderMp(){
-    if (!MP.named) { mpEl.follow.hidden = true; return; }
-    const list = MP.others.map((p, i) => '<b>' + escapeHtml(nameOf(p, i)) + '</b>' + (p.presence && p.presence.ch ? ' (Chapter ' + (+p.presence.ch) + ')' : ' (menu)'));
-    if (Date.now() < (MP.noteUntil || 0)) return;
-    mpStatus('Room <b>' + MP.code.toUpperCase() + '</b> · ' + (list.length ? 'with ' + list.join(', ') : 'waiting for your friend to open the link…'));
-    // offer to follow a friend into the chapter they are playing
-    const L = !inChapter && newestLeader();
-    if (L) { const i = MP.others.indexOf(L.p); const t = 'JOIN ' + nameOf(L.p, i).toUpperCase() + ' IN CHAPTER ' + L.ch; if (mpEl.follow.textContent !== t) mpEl.follow.textContent = t; mpEl.follow.hidden = false; mpEl.follow.dataset.ch = L.ch; }
-    else mpEl.follow.hidden = true;
-  }
-  function escapeHtml(t){ return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
-  async function mpJoin(code){
-    mpStatus('Connecting…');
-    const room = await mpConnect();
-    if (!room) { mpStatus(MP.why === 'firebase-load' ? 'Couldn\u2019t reach the multiplayer server. Check your internet and try again.' : 'Multiplayer isn\u2019t available on this copy of the game (' + (MP.why || 'offline') + ').'); return false; }
-    try {
-      if (MP.named) { try { await MP.named.leave(); } catch (e) {} MP.named = null; }
-      MP.named = await room.join('etp-' + code); MP.code = code; MP.others = []; MP.meKey = MP.named.me || null;
-      MP.named.onPeers(ch => {
-        MP.others = ch.peers.filter(p => !p.isMe && p.kind === 'viewer');
-        const me = ch.peers.find(p => p.isMe); if (me) MP.meKey = me.peer;
-        mpTakeFrames(); renderMp(); resolveNames(); mpAutoFollow();
-      }, () => { MP.named = null; mpStatus('Lost the connection to the room. Generate or join again.'); });
-      mpEl.link.value = linkFor(code); mpEl.copy.hidden = false; mpEl.join.hidden = true;
-      try { history.replaceState(null, '', '#mp-' + code); } catch (e) { try { location.hash = 'mp-' + code; } catch (e2) {} }
-      MP.last = null; mpPresence(mpChapterFields()); renderMp();
-      return true;
-    } catch (e) {
-      MP.named = null;
-      mpStatus(e && e.code === 'not_permitted' ? 'This account can’t use multiplayer rooms here.' : 'Couldn’t join the room right now. Try again in a moment.');
-      return false;
-    }
-  }
-  function mpPresence(patch){
-    if (!MP.named) return;
-    MP.named.presence(Object.assign({ v: 1, c: MP.color, nm: COLOR_NAMES[MP.color] + ' Explorer' }, patch)).catch(() => {});
-  }
-  // ---- playing together: whoever starts a chapter leads it; everyone else in the room is brought along ----
-  const serverNow = () => (MP.named && MP.named.now) ? MP.named.now() : Date.now();
-  function newestLeader(){
-    let best = null;
-    for (const p of MP.others) {
-      const q = p.presence || {}, ch = +q.ch, ld = +q.ld || 0;
-      if (ld && ch >= 1 && ch <= 3 && !q.fo && (!best || ld > best.ld)) best = { key: p.peer, ch, ld, p };
-    }
-    return best;
-  }
-  function mpChapterFields(){
-    return { ch: MP.current, ld: MP.role === 'lead' ? MP.myLd : null, fo: MP.role === 'guest' ? MP.leadKey : null, ac: null, w: null };
-  }
-  function mpTakeFrames(){   // a friend: keep the leader's newest snapshots for the chapter to read
-    if (MP.role !== 'guest' || !inChapter) return;
-    const L = MP.others.find(p => p.peer === MP.leadKey), raw = L && L.presence && L.presence.w;
-    if (typeof raw !== 'string' || raw === MP.lastW) return;
-    MP.lastW = raw;
-    try { MP.frames.push({ w: JSON.parse(raw), at: performance.now() }); if (MP.frames.length > 12) MP.frames.shift(); } catch (e) {}
-  }
-  function mpAutoFollow(){
-    if (!MP.named || MP.switching || !started || leaving) return;
-    const L = newestLeader();
-    if (MP.role === 'guest' && inChapter) {
-      if (L && L.ld > MP.leadAt && L.ld !== MP.declined) { followInto(L); return; }   // someone started something newer: go there
-      const cur = MP.others.find(p => p.peer === MP.leadKey), q = (cur && cur.presence) || {};
-      if (!cur || +q.ch !== MP.current || +q.ld !== MP.leadAt) leaderGone();
-      return;
-    }
-    if (!L || L.ld === MP.declined) return;
-    if (inChapter && MP.role === 'lead' && MP.myLd >= L.ld) return;   // you started after them: they come to you
-    followInto(L);
-  }
-  async function followInto(L){
-    MP.switching = true;
-    try {
-      if (inChapter) await exitChapter('next');
-      if (!inChapter) { MP.declined = 0; await enterChapter(L.ch, L); }
-    } finally { MP.switching = false; }
-    setTimeout(mpAutoFollow, 50);
-  }
-  function leaderGone(){
-    MP.switching = true;
-    exitChapter('gone').finally(() => { MP.switching = false; mpStatus('Your friend left the chapter, so you are back in the menu.'); MP.noteUntil = Date.now() + 6000; setTimeout(renderMp, 6100); });
-  }
-  // the link handed to each chapter
-  function mpLink(n){
-    return {
-      coop: true,
-      isGuest: () => MP.role === 'guest',
-      myKey: () => MP.meKey,
-      report(eye, yaw, area, crouch, dead){
-        if (!MP.named) return;
-        const now = performance.now(); if (now - MP.lastT < 90) return;
-        const s = { ch: n, a: area || 1, p: [+eye[0].toFixed(2), +eye[1].toFixed(2), +eye[2].toFixed(2)], y: +yaw.toFixed(2), cr: crouch ? 1 : 0, dead: dead ? 1 : 0 };
-        const L = MP.last;
-        if (L && L.a === s.a && L.cr === s.cr && L.dead === s.dead && Math.abs(L.p[0] - s.p[0]) < .02 && Math.abs(L.p[1] - s.p[1]) < .02 && Math.abs(L.p[2] - s.p[2]) < .02 && Math.abs(L.y - s.y) < .02 && now - MP.lastT < 2000) return;
-        MP.last = s; MP.lastT = now; mpPresence(s);
-      },
-      peers(){
-        if (!MP.named) return [];
-        const out = [];
-        MP.others.forEach((p, i) => {
-          const q = p.presence || {};
-          if (+q.ch !== n || !Array.isArray(q.p) || q.p.length !== 3) return;
-          const [x, y, z] = q.p.map(Number); if (![x, y, z].every(isFinite)) return;
-          out.push({ key: p.peer, name: nameOf(p, i), color: (+q.c || 0) % 6, area: +q.a || 1, x, y, z, yw: +q.y || 0, crouch: !!q.cr, dead: !!q.dead });
-        });
-        return out;
-      },
-      // leader: the friends who are playing in your game
-      guests(){
-        if (!MP.named || MP.role !== 'lead') return [];
-        const out = [];
-        MP.others.forEach((p, i) => {
-          const q = p.presence || {};
-          if (+q.ch !== n || q.fo !== MP.meKey) return;
-          const [x, y, z] = (Array.isArray(q.p) && q.p.length === 3) ? q.p.map(Number) : [NaN, NaN, NaN];   // not placed yet: still send them the world
-          let ac = null; if (typeof q.ac === 'string') try { ac = JSON.parse(q.ac); } catch (e) {}
-          out.push({ key: p.peer, name: nameOf(p, i), area: +q.a || 1, x, y, z, yw: +q.y || 0, crouch: !!q.cr, dead: !!q.dead, ac: Array.isArray(ac) ? ac : null });
-        });
-        return out;
-      },
-      publish(w){ if (MP.named && MP.role === 'lead') mpPresence({ w: JSON.stringify(w) }); },
-      hostFrames(){ mpTakeFrames(); const f = MP.frames; MP.frames = []; return f; },
-      sendAct(kind){
-        const t = Math.max(Date.now(), (MP.acts.length ? MP.acts[MP.acts.length - 1][0] + 1 : 0));
-        MP.acts.push([t, String(kind)]); if (MP.acts.length > 6) MP.acts.shift();
-        mpPresence({ ac: JSON.stringify(MP.acts) });
-      }
-    };
-  }
-  function mpSetChapter(n){ MP.current = n; MP.last = null; MP.acts = []; MP.frames = []; MP.lastW = ''; mpPresence(Object.assign(mpChapterFields(), { p: null, dead: 0 })); renderMp(); }
-  mpEl.gen.addEventListener('click', async () => {
-    sfx('select');
-    const abc = 'abcdefghjkmnpqrstuvwxyz23456789'; let code = '';
-    const r = new Uint32Array(6); try { crypto.getRandomValues(r); } catch (e) { for (let i = 0; i < 6; i++) r[i] = Math.random() * 1e9; }
-    for (let i = 0; i < 6; i++) code += abc[r[i] % abc.length];
-    mpEl.link.value = linkFor(code); mpEl.copy.hidden = false;
-    await mpJoin(code);
-  });
-  mpEl.copy.addEventListener('click', async () => {
-    const text = mpEl.link.value; let ok = false;
-    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {}
-    if (!ok) { try { mpEl.link.focus(); mpEl.link.select(); ok = document.execCommand && document.execCommand('copy'); } catch (e) {} }
-    mpEl.copy.textContent = ok ? 'COPIED!' : 'SELECT & COPY'; sfx(ok ? 'select' : 'locked');
-    setTimeout(() => { mpEl.copy.textContent = 'COPY'; }, 1600);
-  });
-  mpEl.link.addEventListener('input', () => {
-    const c = codeOf(mpEl.link.value);
-    mpEl.join.hidden = !c || c === MP.code; mpEl.copy.hidden = !(MP.code && mpEl.link.value === linkFor(MP.code));
-  });
-  mpEl.link.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const c = codeOf(mpEl.link.value); if (c) mpJoin(c); } });
-  mpEl.join.addEventListener('click', () => { const c = codeOf(mpEl.link.value); if (c) { sfx('select'); mpJoin(c); } });
-  mpEl.follow.addEventListener('click', () => { const L = newestLeader(); if (L && !inChapter) { sfx('select'); MP.declined = 0; followInto(L); } });
-  // opened from a friend's link (#mp-xxxxxx): join their room straight away
-  { const c = /^#mp-([a-z0-9]{6})$/.test(location.hash) ? location.hash.slice(4) : null; if (c) { mpEl.link.value = linkFor(c); mpJoin(c); } }
 
   /* ---------- settings ---------- */
   const vol = $('#vol'), volOut = $('#volOut'), bri = $('#bri'), briOut = $('#briOut');
