@@ -242,7 +242,7 @@
         </button>
         <button class="card" id="ch4" aria-label="Chapter 4">
           <span class="thumb thumb4"></span>
-          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Finish Chapter 3</span></span>
           <span class="label"><span class="num">CHAPTER <b>4</b></span></span>
         </button>
         <button class="card locked" data-ch="5" aria-disabled="true" aria-label="Chapter 5, coming soon">
@@ -610,10 +610,10 @@
   // start downloading Chapter 1 as soon as the chapter list opens
   document.querySelector('[data-go="chapters"]').addEventListener('click', () => { loadChapterAssets().catch(() => {}); });
   const ch2 = $('#ch2');
-  const ch3 = $('#ch3');
+  const ch3 = $('#ch3'), ch4 = $('#ch4');
   const PROG = { done1: !!store.get('done1', false), done2: !!store.get('done2', false), done3: !!store.get('done3', false), done4: !!store.get('done4', false) };
   function refreshLocks(){
-    for (const [card, n] of [[ch2, 2], [ch3, 3]]) {
+    for (const [card, n] of [[ch2, 2], [ch3, 3], [ch4, 4]]) {
       const locked = !PROG['done' + (n - 1)];
       card.classList.toggle('locked', locked);
       card.setAttribute('aria-disabled', locked ? 'true' : 'false');
@@ -631,8 +631,8 @@
     if (ch3.classList.contains('locked')) { lockedShake(ch3); return; }
     sfx('select'); ch3.classList.remove('pressed'); void ch3.offsetWidth; ch3.classList.add('pressed'); enterChapter(3);
   });
-  const ch4 = $('#ch4');
   ch4.addEventListener('click', () => {
+    if (ch4.classList.contains('locked')) { lockedShake(ch4); return; }
     sfx('select'); ch4.classList.remove('pressed'); void ch4.offsetWidth; ch4.classList.add('pressed'); enterChapter(4);
   });
   document.querySelectorAll('.card[data-ch]').forEach(c => c.addEventListener('click', () => lockedShake(c)));
