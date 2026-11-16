@@ -795,7 +795,7 @@
   function makeAudio(getAC, sfxOn) {
     const ac = getAC && getAC();
     const none = () => {};
-    if (!ac) return { step: none, pstep: none, setHum: none, clang: none, crash: none, thud: none, siren: none, engine: none, boom: none, ring: none, growl: none, clack: none, screech: none, scream: none, water: none, pickup: none, creak: none, splash: none, roar: none, rumble: none, lock: none, jump: none, land: none, glass: none, click: none, buzz: none, grind: none, scratch: none, squeal: none, charge: none, zap: none, snore: none, stop: none };
+    if (!ac) return { step: none, pstep: none, setHum: none, clang: none, crash: none, thud: none, siren: none, engine: none, boom: none, ring: none, growl: none, clack: none, screech: none, scream: none, water: none, pickup: none, creak: none, splash: none, roar: none, rumble: none, lock: none, jump: none, land: none, glass: none, click: none, buzz: none, grind: none, scratch: none, squeal: none, charge: none, zap: none, snore: none, stop: none, wind: none, gust: none, fallRoar: none, whoosh: none };
     const out = ac.createGain(); out.gain.value = 0; out.connect(ac.destination);
     out.gain.setTargetAtTime(1, ac.currentTime, 1.2);
     const sfx = ac.createGain(); sfx.connect(out);
@@ -836,6 +836,12 @@
     const wbp = ac.createBiquadFilter(); wbp.type = 'bandpass'; wbp.frequency.value = 700; wbp.Q.value = .7;
     const wg = ac.createGain(); wg.gain.value = 0; wsrc.connect(wbp); wbp.connect(wg); wg.connect(out); wsrc.start();
     let waterLevel = 0, nextDrip = 0;
+    // rooftop wind: two band-passed noise layers; gusts swell the level and pitch
+    const windSrc = ac.createBufferSource(); windSrc.buffer = nb; windSrc.loop = true; windSrc.playbackRate.value = .5;
+    const wbp1 = ac.createBiquadFilter(); wbp1.type = 'bandpass'; wbp1.frequency.value = 380; wbp1.Q.value = .9;
+    const wbp2 = ac.createBiquadFilter(); wbp2.type = 'bandpass'; wbp2.frequency.value = 1200; wbp2.Q.value = 2.5;
+    const windG = ac.createGain(); windG.gain.value = 0; const windG2 = ac.createGain(); windG2.gain.value = 0;
+    windSrc.connect(wbp1); wbp1.connect(windG); windG.connect(out); windSrc.connect(wbp2); wbp2.connect(windG2); windG2.connect(out); windSrc.start();
     // high ringing after the blast
     const ringO = ac.createOscillator(), ringG = ac.createGain(); ringO.frequency.value = 3350; ringG.gain.value = 0; ringO.connect(ringG); ringG.connect(out); ringO.start();
     const api = {
@@ -901,6 +907,36 @@
         const t = ac.currentTime;
         if (level > .1 && t > nextDrip) { nextDrip = t + .4 + Math.random() * 2.2; const f = 900 + Math.random() * 1400; tone(t, f, f * .55, .09, .05 * level); }
       },
+      wind(level, t, gust = 0) {
+        const n = .5 + .3 * Math.sin(t * .37) + .2 * Math.sin(t * 1.13 + 1) + .15 * Math.sin(t * 2.9);   // slow wandering gusts
+        const g = level * (.35 + .4 * n) + gust * .9, now = ac.currentTime;
+        windG.gain.setTargetAtTime(g * .32, now, .15); windG2.gain.setTargetAtTime(g * g * .05, now, .15);
+        wbp1.frequency.setTargetAtTime(260 + 260 * n + 500 * gust, now, .2); wbp2.frequency.setTargetAtTime(900 + 700 * n + 900 * gust, now, .2);
+      },
+      gust(power = 1) {   // a big rush of air
+        if (!sfxOn()) return; const t = ac.currentTime;
+        const src = ac.createBufferSource(); src.buffer = nb; const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = .8;
+        f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1600, t + .9); f.frequency.exponentialRampToValueAtTime(400, t + 2.6);
+        const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.9 * power, t + .5); g.gain.exponentialRampToValueAtTime(.001, t + 2.8);
+        src.connect(f); f.connect(g); g.connect(sfx); src.start(t, Math.random()); src.stop(t + 2.9);
+      },
+      whoosh(vol = 1) {   // falling air rushing past
+        if (!sfxOn()) return; const t = ac.currentTime;
+        const src = ac.createBufferSource(); src.buffer = nb; const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = .6;
+        f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2200, t + 2.2);
+        const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.8 * vol, t + 1.6); g.gain.linearRampToValueAtTime(0, t + 2.4);
+        src.connect(f); f.connect(g); g.connect(sfx); src.start(t, Math.random()); src.stop(t + 2.5);
+      },
+      fallRoar(vol = 1) {   // a roar that drops away below you
+        if (!sfxOn()) return; const t = ac.currentTime;
+        for (const [f0, ty, gv] of [[150, 'sawtooth', .45], [96, 'square', .2]]) {
+          const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain(); o.type = ty;
+          o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * .32, t + 2.6);
+          f.type = 'lowpass'; f.frequency.setValueAtTime(1400, t); f.frequency.exponentialRampToValueAtTime(220, t + 2.6);
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gv * vol, t + .15); g.gain.exponentialRampToValueAtTime(.001, t + 2.8);
+          o.connect(f); f.connect(g); g.connect(sfx); o.start(t); o.stop(t + 2.9);
+        }
+      },
       pickup() { if (!sfxOn()) return; const t = ac.currentTime; tone(t, 1500, 1200, .05, .15, 'square'); tone(t + .07, 2100, 1900, .05, .1, 'square'); },
       roar(vol = 1) {
         if (!sfxOn()) return; const t = ac.currentTime;
@@ -960,7 +996,7 @@
         o.connect(of); of.connect(og); og.connect(sfx); o.start(t); o.stop(t + 1.4);
       },
       creak() { if (!sfxOn()) return; const t = ac.currentTime; const o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter(); o.type = 'sawtooth'; o.frequency.setValueAtTime(95, t); o.frequency.linearRampToValueAtTime(140, t + .9); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 8; g.gain.setValueAtTime(.0, t); g.gain.linearRampToValueAtTime(.3, t + .1); g.gain.exponentialRampToValueAtTime(.0001, t + 1.0); o.connect(f); f.connect(g); g.connect(sfx); o.start(t); o.stop(t + 1.05); },
-      stop() { out.gain.setTargetAtTime(0, ac.currentTime, .3); setTimeout(() => { try { noise.stop(); hum.stop(); so1.stop(); so2.stop(); eo1.stop(); eo2.stop(); wsrc.stop(); ringO.stop(); out.disconnect(); } catch (e) {} }, 1500); }
+      stop() { out.gain.setTargetAtTime(0, ac.currentTime, .3); setTimeout(() => { try { noise.stop(); hum.stop(); so1.stop(); so2.stop(); eo1.stop(); eo2.stop(); wsrc.stop(); ringO.stop(); windSrc.stop(); out.disconnect(); } catch (e) {} }, 1500); }
     };
     return api;
   }

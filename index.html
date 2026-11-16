@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Escape the prison</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Escape">
+<meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
@@ -111,6 +119,7 @@
   @keyframes press{0%{transform:scale(1)}35%{transform:scale(.95)}70%{transform:scale(1.02)}100%{transform:scale(1)}}
 
   .card .thumb2{background-position:34% 38%;filter:hue-rotate(-75deg) saturate(1.7) brightness(.75) contrast(1.1)}
+  .card .thumb4{background:url(ch4.jpg) 50% 60%/cover no-repeat}
   .card .thumb3{background-position:62% 30%;filter:hue-rotate(150deg) saturate(1.6) brightness(.72) contrast(1.15)}
   .card.locked{cursor:not-allowed;border-color:#262626;box-shadow:0 18px 44px rgba(0,0,0,.6)}
   .card.locked .thumb{background-position:18% 55%;filter:grayscale(1) brightness(.28) blur(2px);transform:scale(1.08)}
@@ -231,10 +240,10 @@
           <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Finish Chapter 2</span></span>
           <span class="label"><span class="num">CHAPTER <b>3</b></span></span>
         </button>
-        <button class="card locked" data-ch="4" aria-disabled="true" aria-label="Chapter 4, coming soon">
-          <span class="thumb" style="background-position:55% 20%"></span>
+        <button class="card" id="ch4" aria-label="Chapter 4">
+          <span class="thumb thumb4"></span>
           <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
-          <span class="label"><span class="num">CHAPTER 4</span></span>
+          <span class="label"><span class="num">CHAPTER <b>4</b></span></span>
         </button>
         <button class="card locked" data-ch="5" aria-disabled="true" aria-label="Chapter 5, coming soon">
           <span class="thumb" style="background-position:85% 75%"></span>
@@ -322,6 +331,7 @@
 <audio id="croak" src="croak.mp3" loop preload="auto"></audio>
 <audio id="hand" src="hand.mp3" preload="auto"></audio>
 <audio id="senengeon" src="senengeon.mp3" loop preload="auto"></audio>
+<audio id="torch" src="torch.mp3" loop preload="auto"></audio>
 
 <script>
 (() => {
@@ -487,8 +497,14 @@
     if (!c3P) { c3P = Promise.all([loadScript('mimicker-data.js', () => !!window.MIMICKER_DATA), loadScript('chapter3.js', () => !!window.Chapter3)]); c3P.catch(() => { c3P = null; }); }
     return c3P;
   }
+  let c4P = null;
+  function loadChapter4Assets(){
+    if (!c4P) { c4P = Promise.all([loadScript('hellish-data.js', () => !!window.HELLISH_DATA), loadScript('chapter4.js', () => !!window.Chapter4)]); c4P.catch(() => { c4P = null; }); }
+    return c4P;
+  }
   const SLEEPER_VARS = { kabob: 'KABOB_DATA', bitter: 'BITTER_DATA', josh: 'JOSH_DATA', dadadoo: 'DADADOO_DATA' };
   const CREDITS = {
+    4: 'Model: <a href="https://sketchfab.com/3d-models/hellish-banbangarten-of-banban-8-anti-devil-199cb387ecf44e228077d20c9ba34491" target="_blank" rel="noopener">\u201cHellish Banban/Garten of Banban 8 (Anti Devil)\u201d</a> by Elite Big Speakerman \u2014 <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>',
     3: 'Models: <a href="https://sketchfab.com/3d-models/miss-mimickergarten-of-banban-8-anti-devil-8e6c423cf1544c56b24576c3320d7f83" target="_blank" rel="noopener">\u201cMiss Mimicker/Garten of Banban 8 (Anti Devil)\u201d</a> by Elite Big Speakerman \u00b7 <a href="https://sketchfab.com/3d-models/mr-kabob-man-mech-rigged-a80092172615427e8d53b846b6d4969d" target="_blank" rel="noopener">\u201cMr. Kabob Man Mech Rigged\u201d</a> by Unschooling with Fin \u00b7 <a href="https://sketchfab.com/3d-models/garten-of-banban-7-naughtified-bittergiggle-21163350ad6441748b3096e750b2af19" target="_blank" rel="noopener">\u201cNaughtified Bittergiggle\u201d</a>, <a href="https://sketchfab.com/3d-models/garten-of-banban-2-jumbo-josh-3824c80d07e44751a7f0ec9ce72f53ca" target="_blank" rel="noopener">\u201cJumbo Josh\u201d</a> and <a href="https://sketchfab.com/3d-models/sir-dadadoo-garten-of-banban-6-fanmade-anims-da36c7d3e91d41638c1ee11c6d28e061" target="_blank" rel="noopener">\u201cSir Dadadoo\u201d</a> by nnneagu (simplified &amp; animated) \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>',
     1: $('#credit1').innerHTML,
     2: 'Models: <a href="https://sketchfab.com/3d-models/hellish-banban-rigged-c65f6cbd26d24ac6a11511bca18cab83" target="_blank" rel="noopener">\u201cHellish Banban Rigged\u201d</a> and <a href="https://sketchfab.com/3d-models/sheriff-toadster-rigged-official-297ae0f93278413298f4f8c5b8811dbd" target="_blank" rel="noopener">\u201cSheriff Toadster Rigged Official\u201d</a> by nnneagu (simplified &amp; animated) \u00b7 <a href="https://sketchfab.com/3d-models/garten-of-banban-7-syringeon-5ff243faee14410888f72bd646ae5d75" target="_blank" rel="noopener">\u201cGarten of Banban 7 - Syringeon\u201d</a> and <a href="https://sketchfab.com/3d-models/naughtyones-garten-of-banban-6-fanmade-anims-f0c4120365064f2fad9935234f8a4d92" target="_blank" rel="noopener">\u201cNaughtyOnes - Garten of Banban 6\u201d</a> by nnneagu (simplified) \u00b7 <a href="https://sketchfab.com/3d-models/rope-knots-aa6380f3e5d442b1a1971d4cb1c88ccb" target="_blank" rel="noopener">\u201cRope Knots\u201d</a> by aneeqayounas \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>'
@@ -499,13 +515,13 @@
     inChapter = true; leaving = false;
     $('#credit1').innerHTML = CREDITS[n];
     // unlock the chapter's sounds inside this tap so they may play later on phones
-    const unlock = n === 1 ? [voice, $('#borrowed'), $('#ride'), $('#buckle'), $('#mines')] : n === 2 ? [$('#croak'), $('#hand'), $('#senengeon')] : [$('#borrowed')];
+    const unlock = n === 1 ? [voice, $('#borrowed'), $('#ride'), $('#buckle'), $('#mines')] : n === 2 ? [$('#croak'), $('#hand'), $('#senengeon')] : n === 4 ? [$('#torch')] : [$('#borrowed')];
     for (const el of unlock) {
       try { const p = el.play(); el.pause(); el.currentTime = 0; if (p && p.catch) p.catch(() => {}); } catch (e) {}
     }
     // phones only let a page speak after a tap: say nothing now so Syringeon can talk later
     if (n === 2) try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
-    const assets = n === 1 ? loadChapterAssets() : n === 2 ? loadChapter2Assets() : loadChapter3Assets();
+    const assets = n === 1 ? loadChapterAssets() : n === 2 ? loadChapter2Assets() : n === 4 ? loadChapter4Assets() : loadChapter3Assets();
     fadeEl.classList.remove('slow'); fadeEl.classList.add('on');
     fadeMusicOut(1100);
     await wait(1300);
@@ -523,7 +539,12 @@
     if (leaving) return;
     const canvas = document.createElement('canvas'); sceneEl.prepend(canvas);
     try {
-      if (n === 3) scene = await window.Chapter3.start({
+      if (n === 4) scene = await window.Chapter4.start({
+        canvas, container: sceneEl, hellish: window.HELLISH_DATA,
+        audio: { torch: $('#torch') }, musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music,
+        getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(4)
+      });
+      else if (n === 3) scene = await window.Chapter3.start({
         canvas, container: sceneEl, mimicker: window.MIMICKER_DATA, getSleeper: k => window[SLEEPER_VARS[k]] || null,
         audio: { borrowed: $('#borrowed') }, musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music,
         getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(3)
@@ -549,6 +570,7 @@
     }
     window.__scene = scene;
     if (n === 1) loadScript('claw-data.js', () => !!window.CLAW_DATA).catch(() => {});
+    else if (n === 4) { /* everything is already loaded */ }
     else if (n === 3) ['kabob', 'bitter', 'josh', 'dadadoo'].reduce((pr, k) => pr.then(() => loadScript(k + '-data.js', () => !!window[SLEEPER_VARS[k]])).catch(() => {}), Promise.resolve());
     else loadScript('toad-data.js', () => !!window.TOAD_DATA).catch(() => {})
       .then(() => loadScript('rope-data.js', () => !!window.ROPE_DATA)).catch(() => {})
@@ -568,7 +590,7 @@
     if (scene) { scene.stop(); scene = null; window.__scene = null; }
     // the ride track is Wheels of Freedom with the driver's line on top: hand over to the menu music at the same spot
     const ride = $('#ride'), ridePos = ride.paused ? -1 : ride.currentTime;
-    for (const el of [voice, $('#borrowed'), $('#buckle'), $('#mines'), ride, $('#croak'), $('#hand'), $('#senengeon')]) { try { el.pause(); el.currentTime = 0; } catch (e) {} }
+    for (const el of [voice, $('#borrowed'), $('#buckle'), $('#mines'), ride, $('#croak'), $('#hand'), $('#senengeon'), $('#torch')]) { try { el.pause(); el.currentTime = 0; } catch (e) {} }
     try { speechSynthesis.cancel(); } catch (e) {}
     if (ridePos >= 0 && S.music) { try { music.currentTime = ridePos; } catch (e) {} fade = 1; applyMusic(); playMusic(); }
     sceneEl.querySelectorAll('canvas').forEach(c => c.remove());
@@ -589,7 +611,7 @@
   document.querySelector('[data-go="chapters"]').addEventListener('click', () => { loadChapterAssets().catch(() => {}); });
   const ch2 = $('#ch2');
   const ch3 = $('#ch3');
-  const PROG = { done1: !!store.get('done1', false), done2: !!store.get('done2', false), done3: !!store.get('done3', false) };
+  const PROG = { done1: !!store.get('done1', false), done2: !!store.get('done2', false), done3: !!store.get('done3', false), done4: !!store.get('done4', false) };
   function refreshLocks(){
     for (const [card, n] of [[ch2, 2], [ch3, 3]]) {
       const locked = !PROG['done' + (n - 1)];
@@ -608,6 +630,10 @@
   ch3.addEventListener('click', () => {
     if (ch3.classList.contains('locked')) { lockedShake(ch3); return; }
     sfx('select'); ch3.classList.remove('pressed'); void ch3.offsetWidth; ch3.classList.add('pressed'); enterChapter(3);
+  });
+  const ch4 = $('#ch4');
+  ch4.addEventListener('click', () => {
+    sfx('select'); ch4.classList.remove('pressed'); void ch4.offsetWidth; ch4.classList.add('pressed'); enterChapter(4);
   });
   document.querySelectorAll('.card[data-ch]').forEach(c => c.addEventListener('click', () => lockedShake(c)));
 
