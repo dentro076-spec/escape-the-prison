@@ -1082,6 +1082,330 @@
       jump: q('.c1-jump'), crouch: q('.c1-crouch'), noise: q('.c1-noise'), noiseBar: q('.c1-noise b'), flash: q('.c1-flash'), black: q('.c1-black'), lids: q('.c1-lids'), toast: q('.c1-toast'), dead: q('.c1-dead'), respawn: q('.c1-dead button') };
   }
 
+  /* ================= multiplayer: other players drawn as little explorers with name tags ================= */
+  function latheGeo(g, prof, seg, cx = 0, cy = 0, cz = 0) {
+    const base = g.p.length / 3;
+    for (let i = 0; i < prof.length; i++) {
+      const [r, y] = prof[i], a0 = prof[Math.max(0, i - 1)], a1 = prof[Math.min(prof.length - 1, i + 1)];
+      const dr = a1[0] - a0[0], dy = a1[1] - a0[1], nl = Math.hypot(dr, dy) || 1, nr = dy / nl, ny = -dr / nl;
+      for (let s = 0; s <= seg; s++) { const a = s / seg * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a); g.v([cx + c * r, cy + y, cz + sn * r], [c * nr, ny, sn * nr], [s / seg, i / (prof.length - 1)]); }
+    }
+    for (let i = 0; i < prof.length - 1; i++) for (let s = 0; s < seg; s++) { const a = base + i * (seg + 1) + s, b = a + seg + 1; g.i.push(a, b, a + 1, a + 1, b, b + 1); }
+  }
+  const sphereProf = (r, n = 10) => { const p = []; for (let i = 0; i <= n; i++) { const a = -Math.PI / 2 + Math.PI * i / n; p.push([Math.cos(a) * r + 1e-4, Math.sin(a) * r]); } return p; };
+  const MP_COLORS = [[.31, .72, 1], [1, .42, .42], [.49, .85, .57], [.96, .82, .29], [.76, .65, 1], [1, .58, .26]];
+  function makeMpAvatars(gl, container) {
+    const mk = f => { const g = new Geo(); f(g); return meshFromGeo(gl, g); };
+    const body = mk(g => latheGeo(g, [[.001, .55], [.2, .56], [.27, .66], [.28, .95], [.25, 1.18], [.14, 1.28], [.001, 1.3]], 14));
+    const head = mk(g => latheGeo(g, sphereProf(.21, 10), 14, 0, 1.5, 0));
+    const cap = mk(g => { latheGeo(g, [[.001, 1.73], [.12, 1.72], [.2, 1.66], [.225, 1.56], [.23, 1.55]], 14); g.box(-.17, 1.55, .1, .17, 1.58, .36); });
+    const eyes = mk(g => { latheGeo(g, sphereProf(.045, 6), 8, -.075, 1.53, .185); latheGeo(g, sphereProf(.045, 6), 8, .075, 1.53, .185); });
+    const leg = mk(g => g.cyl(0, 0, -.58, 0, .085, .095, 10));     // hangs from the hip (local origin)
+    const arm = mk(g => g.cyl(0, 0, -.5, 0, .06, .07, 8));         // hangs from the shoulder
+    const layer = document.createElement('div'); layer.className = 'mp-tags';
+    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2';
+    container.appendChild(layer);
+    const tracks = new Map();
+    function draw(prog, VP, t, dt, peers, area, cam) {
+      const seen = new Set();
+      for (const pr of peers || []) {
+        if (pr.area !== area || pr.dead) continue;
+        seen.add(pr.key);
+        let k = tracks.get(pr.key);
+        if (!k) { k = { x: pr.x, y: pr.y, z: pr.z, yw: pr.yw, ph: 0, sp: 0, tag: null }; tracks.set(pr.key, k); }
+        const f = 1 - Math.exp(-dt * 12), ox = k.x, oz = k.z;
+        k.x += (pr.x - k.x) * f; k.y += (pr.y - k.y) * f; k.z += (pr.z - k.z) * f;
+        let dy = pr.yw - k.yw; dy = ((dy + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; k.yw += dy * f;
+        if (Math.hypot(pr.x - k.x, pr.z - k.z) > 8) { k.x = pr.x; k.y = pr.y; k.z = pr.z; }   // teleported (respawn)
+        const speed = dt > 0 ? Math.hypot(k.x - ox, k.z - oz) / dt : 0; k.sp += (Math.min(speed, 6) - k.sp) * Math.min(1, dt * 6); k.ph += dt * k.sp * 2.2;
+        const cr = pr.crouch ? 1 : 0, sy = cr ? .58 : 1, feet = k.y - (cr ? .85 : 1.6);
+        if (cam && Math.hypot(k.x - cam[0], k.z - cam[2]) < .75) { if (k.tag) k.tag.style.display = 'none'; continue; }   // standing inside you (same spawn point)
+        const col = MP_COLORS[pr.color % MP_COLORS.length], swing = Math.sin(k.ph) * Math.min(1, k.sp / 2.5) * .7, bob = Math.abs(Math.sin(k.ph)) * .04 * Math.min(1, k.sp / 2.5);
+        const root = M4.trs([k.x, feet + bob, k.z], Q.aa(0, 1, 0, Math.PI - k.yw), [1, sy, 1]);
+        const part = (m, color, local, o = {}) => {
+          gl.uniformMatrix4fv(prog.u.uModel, false, local ? M4.mul(root, local) : root);
+          gl.uniform3fv(prog.u.uColor, color); gl.uniform1i(prog.u.uUseTex, 0); gl.uniform1f(prog.u.uSpec, o.spec || .3); gl.uniform1f(prog.u.uShine, o.shine || 30); gl.uniform3fv(prog.u.uEmissive, o.em || [0, 0, 0]);
+          gl.bindVertexArray(m.vao); gl.drawElements(gl.TRIANGLES, m.count, m.type, 0);
+        };
+        const glowC = [col[0] * .12, col[1] * .12, col[2] * .12];   // a faint glow so friends are findable in the dark
+        part(body, col, null, { em: glowC });
+        part(head, [.98, .82, .68], null, { em: [.05, .04, .03] });
+        part(cap, col, null, { spec: .5, em: glowC });
+        part(eyes, [.02, .02, .02], null, { spec: 1.2, shine: 80 });
+        for (const s of [-1, 1]) {
+          part(leg, [.16, .17, .24], M4.trs([s * .11, .6, 0], Q.aa(1, 0, 0, s * swing * (cr ? .3 : 1)), [1, 1, 1]));
+          part(arm, col, M4.trs([s * .31, 1.18, 0], Q.mul(Q.aa(1, 0, 0, -s * swing), Q.aa(0, 0, 1, s * .12)), [1, 1, 1]), { em: glowC });
+        }
+        // name tag
+        if (!k.tag) { k.tag = document.createElement('div'); k.tag.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-100%);font:700 13px/1 system-ui,sans-serif;letter-spacing:.06em;padding:4px 8px 3px;border-radius:999px;background:rgba(0,0,0,.55);white-space:nowrap;text-shadow:0 1px 0 #000'; layer.appendChild(k.tag); }
+        if (k.tag.textContent !== pr.name) k.tag.textContent = pr.name;
+        k.tag.style.color = 'rgb(' + col.map(c => Math.round(Math.min(1, c * 1.1) * 255)).join(',') + ')';
+        const hp = [k.x, feet + (cr ? 1.25 : 2.0), k.z], c4 = [0, 1, 2, 3].map(r => VP[r] * hp[0] + VP[4 + r] * hp[1] + VP[8 + r] * hp[2] + VP[12 + r]);
+        const W = layer.clientWidth, H = layer.clientHeight, dist = c4[3];
+        if (c4[3] > .1 && dist < 45) {
+          const sx = (c4[0] / c4[3] * .5 + .5) * W, sy2 = (1 - (c4[1] / c4[3] * .5 + .5)) * H;
+          k.tag.style.display = ''; k.tag.style.transform = `translate(${sx.toFixed(1)}px,${sy2.toFixed(1)}px) translate(-50%,-100%)`; k.tag.style.opacity = String(Math.min(1, (45 - dist) / 10));
+        } else k.tag.style.display = 'none';
+      }
+      gl.uniform3fv(prog.u.uEmissive, [0, 0, 0]); gl.uniformMatrix4fv(prog.u.uModel, false, M4.ident()); gl.bindVertexArray(null);
+      for (const [key, k] of tracks) if (!seen.has(key)) { if (k.tag) k.tag.remove(); tracks.delete(key); }
+    }
+    return { draw, dispose() { layer.remove(); tracks.clear(); } };
+  }
+
+  /* ================= co-op: the leader's game runs the story and the monsters; friends see the same world =================
+     cfg (from each chapter):
+       R            objects to share {name: obj or array}
+       skip         {name: [keys]} extra keys that stay local
+       zone()       a number that changes when the leader moves to a new area (friends get teleported along)
+       ctl()        (leader) does the player have control right now (false = cutscene)
+       dangerAt(feet, g)  (leader) would a monster catch a friend standing here?
+       onGuest(g, dt)     (leader) per-friend upkeep
+       doAct(kind, g)     (leader) run a friend's button press
+       onShared(prev, cur)  (friend) spawn local-only debris when a shared flag flips
+       afterTeleport(hp)  (friend) e.g. copy crouching
+       showAct(kind)      (friend) hide the action button during cutscenes
+       ownCam(phase)      (friend) story scenes where you keep your own camera (e.g. looking around during a ride)
+       guestFree(phase)   (friend) leader-only moments where friends keep playing (e.g. the leader's own short drop)
+       music {name: el | {el, loop}}  */
+  const COOP_SKIP = ['p', 'camYaw', 'camPitch', 'eye', 'dragYaw', 'dragPitch', 'timers', 'toastUntil', 'toastKey', 't', 'act', 'crouch', 'crouchK',
+    'hints', 'saidRoom', 'lastPZ', 'pipKey', 'turnFrom', 'pitchFrom', 'caughtT', 'caughtBy', 'camUp', 'hopFrom', 'jumpFrom', 'leapFrom', 'rideAudio', 'wakeT', 'punchT', 'held'];
+  const COOP_DEAD = { caught: 1, dead: 1, caught2: 1, fell: 1 };
+  const COOP_FX_SKIP = { pstep: 1, jump: 1, land: 1, siren: 1, setHum: 1, engine: 1, water: 1, stop: 1, splash: 1, ring: 1 };
+  function coopPlain(v, d = 0) {
+    if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : 0;
+    if (v === null || typeof v === 'string' || typeof v === 'boolean') return v;
+    if (Array.isArray(v)) return d > 5 ? null : v.map(x => { const y = coopPlain(x, d + 1); return y === undefined ? null : y; });
+    if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+      const o = {};
+      for (const k in v) { const x = v[k]; if (x === undefined || typeof x === 'function') continue; if (x && typeof x === 'object' && !Array.isArray(x) && Object.getPrototypeOf(x) !== Object.prototype) continue; const y = coopPlain(x, d + 1); if (y !== undefined) o[k] = y; }
+      return o;
+    }
+    return undefined;
+  }
+  const COOP_ANG = /yaw|Yaw/;
+  function coopLerp(a, b, k, key) {
+    if (typeof b === 'number' && typeof a === 'number') {
+      if (Number.isInteger(a) && Number.isInteger(b)) return b;   // counters (hits, charge) don't blend
+      if (COOP_ANG.test(key || '')) { const d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * k; }
+      return Math.abs(b - a) > 25 ? b : a + (b - a) * k;   // big jumps (teleports, timers) are not smoothed
+    }
+    if (Array.isArray(b)) return Array.isArray(a) && a.length === b.length ? b.map((x, i) => coopLerp(a[i], x, k, key)) : b;
+    if (b && typeof b === 'object') { if (!a || typeof a !== 'object' || Array.isArray(a)) return b; const o = {}; for (const kk in b) o[kk] = coopLerp(a[kk], b[kk], k, kk); return o; }
+    return b;
+  }
+  const coopIsObj = x => x && typeof x === 'object' && !Array.isArray(x);
+  function coopAssign(target, src, skip) {
+    for (const k in src) {
+      if (skip && skip[k]) continue;
+      const v = src[k], cur = target[k];
+      if (cur && typeof cur === 'object' && !Array.isArray(cur) && Object.getPrototypeOf(cur) !== Object.prototype) continue;   // live objects stay local
+      if (coopIsObj(v) && coopIsObj(cur)) coopAssign(cur, v, null);
+      else if (Array.isArray(v) && Array.isArray(cur) && cur.length === v.length && v.every(coopIsObj) && cur.every(coopIsObj)) v.forEach((x, i) => coopAssign(cur[i], x, null));
+      else if (Array.isArray(v)) { if (Array.isArray(cur)) { cur.length = 0; for (const x of v) cur.push(coopIsObj(x) ? Object.assign({}, x) : Array.isArray(x) ? x.slice() : x); } else target[k] = v.slice(); }
+      else if (coopIsObj(v)) target[k] = JSON.parse(JSON.stringify(v));
+      else target[k] = v;
+    }
+  }
+  function makeCoop(opts, st, hud, sfx, cfg) {
+    const mp = opts.mp;
+    if (!mp || !mp.coop) return null;
+    const guest = mp.isGuest();
+    const SKIP = {};
+    for (const n in cfg.R) { const s = {}; if (n === 'st') for (const k of COOP_SKIP) s[k] = 1; for (const k of ((cfg.skip || {})[n] || [])) s[k] = 1; SKIP[n] = s; }
+    const music = {};
+    for (const n in (cfg.music || {})) { const m = cfg.music[n]; if (m) music[n] = m.el ? m : { el: m, loop: true }; }
+    // ---- leader: note one-shot sounds so friends hear them too ----
+    const fxLog = []; let fxSeq = 0;
+    if (!guest) for (const k in sfx) {
+      if (typeof sfx[k] !== 'function' || COOP_FX_SKIP[k]) continue;
+      const f = sfx[k];
+      sfx[k] = (...a) => { fxLog.push([++fxSeq, k, a.map(x => typeof x === 'number' ? Math.round(x * 100) / 100 : typeof x === 'string' ? x.slice(0, 80) : 0), st.t]); if (fxLog.length > 40) fxLog.shift(); return f(...a); };
+    }
+    let flashN = 0;
+    try { new MutationObserver(() => { if (hud.flash.classList.contains('go')) flashN++; }).observe(hud.flash, { attributes: true, attributeFilter: ['class'] }); } catch (e) {}
+    const kills = {}, killT = {}, actSeen = {}, actQ = {}, actT = {}, gPrev = {}, onceT = {};
+    let sq = 0, pubT = -9, gCache = null, gCacheT = -1;
+    // ---- friend ----
+    let buf = [], lastSq = -1, lastFx = -1, firstFrame = true, prevShared = null, gdead = false, killSeen = null, lastCut = false, lastZone = null,
+      farT = 0, lastFlash = null, ended = false, waitT = 0, deadT = -9, offs = [];
+    function pullFrames() {
+      for (const f of mp.hostFrames()) {
+        if (!f.w || f.w.sq <= lastSq) continue;
+        lastSq = f.w.sq; buf.push(f); if (buf.length > 10) buf.shift();
+        offs.push(f.w.T - f.at / 1000); if (offs.length > 10) offs.shift();
+      }
+    }
+    // the leader's clock as seen here: newest snapshots arrive with the least delay, then wait a little to smooth between them
+    const hostNow = () => buf.length ? performance.now() / 1000 + Math.max(...offs) - .14 : null;
+    function sample(T) {
+      let a = buf[0], b = buf[buf.length - 1];
+      for (let i = 0; i < buf.length - 1; i++) if (buf[i].w.T <= T && buf[i + 1].w.T >= T) { a = buf[i]; b = buf[i + 1]; break; }
+      if (T >= b.w.T || a === b) return { w: b.w, R: b.w.R, cam: b.w.cam };
+      if (T <= a.w.T) return { w: a.w, R: a.w.R, cam: a.w.cam };
+      const k = clamp((T - a.w.T) / Math.max(1e-3, b.w.T - a.w.T), 0, 1);
+      return { w: b.w, R: coopLerp(a.w.R, b.w.R, k), cam: coopLerp(a.w.cam, b.w.cam, k) };
+    }
+    const cutscene = w => !w.ctl && !COOP_DEAD[w.ph] && !(cfg.guestFree && cfg.guestFree(w.ph));   // the leader has no control (a story scene)
+    const camCut = w => cutscene(w) && !(cfg.ownCam && cfg.ownCam(w.ph));             // ...and you watch it through their eyes
+    const api = {
+      guest, _s: null,
+      // friend: the time to run this frame at (the leader's clock); null = nothing from the leader yet
+      time(localT) {
+        if (!guest) return localT;
+        pullFrames();
+        const T = hostNow();
+        if (T === null) {
+          const now = performance.now();
+          if (now - waitT > 3000) { waitT = now; hud.toast.textContent = 'Joining your friend\u2026'; hud.toast.classList.add('show'); }
+          return null;
+        }
+        return T;
+      },
+      // friend: copy the leader's world into this game before the frame runs
+      apply(T) {
+        const s = sample(T); if (!s) return;
+        api._s = s;
+        if (firstFrame) {
+          firstFrame = false; hud.toast.classList.remove('show'); hud.lids.classList.remove('on');
+          lastFx = (s.w.fx || []).reduce((m, e) => Math.max(m, e[0]), -1);
+          killSeen = s.w.kl ? s.w.kl[mp.myKey()] || 0 : 0; lastFlash = s.w.hud ? s.w.hud.fl : 0;
+        }
+        for (const n in cfg.R) {
+          const v = s.R[n]; if (v === undefined) continue;
+          const sk = Object.assign({}, SKIP[n]);
+          if (n === 'st' && COOP_DEAD[v.phase]) sk.phase = 1;   // the leader got caught: you keep playing
+          const tgt = cfg.R[n];
+          if (Array.isArray(tgt)) {
+            if (tgt.length === v.length && v.every(coopIsObj) && tgt.every(coopIsObj)) v.forEach((x, i) => coopAssign(tgt[i], x, sk));
+            else { tgt.length = 0; for (const x of v) tgt.push(coopIsObj(x) ? JSON.parse(JSON.stringify(x)) : x); }
+          } else coopAssign(tgt, v, sk);
+        }
+        if (lastZone === null && cfg.zone) lastZone = cfg.zone();
+        if (prevShared && cfg.onShared) try { cfg.onShared(prevShared, s.R); } catch (e) { console.error(e); }
+        prevShared = s.R;
+        if (COOP_DEAD[s.w.ph]) deadT = T;
+        if (api._first === undefined) { api._first = 1; if (s.w.hp) api.teleport(s.w.hp); }
+      },
+      // after the frame's own camera: watch through the leader's eyes in cutscenes; follow them into new areas
+      camera(t, dt) {
+        if (!guest || !api._s) return;
+        const s = api._s, w = s.w, p = st.p, cut = cutscene(w);
+        if (camCut(w) && s.cam) { st.eye = s.cam.e.slice(); st.camYaw = s.cam.y; st.camPitch = s.cam.p; if ('camUp' in st) st.camUp = s.cam.u || null; }
+        const zone = cfg.zone ? cfg.zone() : 0;
+        const far = w.hp ? Math.hypot(p.x - w.hp[0], p.z - w.hp[2]) : 0;
+        farT = far > 30 && !cut ? farT + dt : 0;
+        if (!cut && lastCut) { p.yaw = st.camYaw; p.pitch = clamp(st.camPitch, -1.2, 1.2); }
+        if (!cut && w.hp && !gdead && ((lastCut && far > 9) || (lastZone !== null && zone !== lastZone) || farT > 4)) { api.teleport(w.hp); farT = 0; }
+        lastCut = cut; if (!cut) lastZone = zone;
+      },
+      teleport(hp) {
+        const p = st.p;
+        p.x = hp[0]; p.z = hp[2]; if ('y' in p) { p.y = hp[1]; p.vy = 0; } p.yaw = hp[3] || 0; p.pitch = 0;
+        if (cfg.afterTeleport) cfg.afterTeleport(hp);
+      },
+      // friend: may you move right now?
+      blocked() { if (!guest) return false; const s = api._s; return gdead || !s || cutscene(s.w); },
+      // after the frame: the leader publishes; friends play the leader's sounds and music and copy the screen overlays
+      post(t, dt) {
+        if (!guest) return api.lead(t, dt);
+        const s = api._s; if (!s) return;
+        const w = s.w;
+        for (const e of (w.fx || [])) if (e[0] > lastFx) { lastFx = e[0]; const f = sfx[e[1]]; if (typeof f === 'function') try { f(...e[2]); } catch (err) {} }
+        for (const n in (w.mu || {})) {
+          const m = music[n]; if (!m) continue; const el = m.el, [on, pos] = w.mu[n];
+          try {
+            if (on && el.paused) {
+              el.loop = !!m.loop; el.muted = !(opts.musicOn ? opts.musicOn() : true); el.volume = opts.musicVol ? opts.musicVol() : 1;
+              if (Math.abs(el.currentTime - pos) > .8) el.currentTime = pos;
+              const pr = el.play(); if (pr && pr.catch) pr.catch(() => {});
+            } else if (!on && !el.paused) el.pause();
+          } catch (e) {}
+        }
+        const h = w.hud || {};
+        if (hud.obj.textContent !== (h.o || '')) hud.obj.textContent = h.o || '';
+        hud.obj.classList.toggle('show', !!h.o); hud.obj.classList.toggle('alarm', !!h.oa);
+        if (h.ts) { if (hud.toast.textContent !== h.ts) hud.toast.textContent = h.ts; hud.toast.classList.add('show'); }
+        else if (!st.toastUntil) hud.toast.classList.remove('show');
+        hud.red.classList.toggle('on', !!h.red);
+        if (!gdead) hud.black.classList.toggle('on', !!h.bl && t - deadT > .7);
+        if (h.fl !== lastFlash) { lastFlash = h.fl; hud.flash.classList.remove('go'); void hud.flash.offsetWidth; hud.flash.classList.add('go'); }
+        const ctl = !gdead && !cutscene(w);
+        hud.zone.classList.toggle('on', ctl);
+        hud.jump.classList.toggle('show', ctl && !!h.jp); if (!ctl) hud.jump.classList.remove('big');
+        if (hud.crouch) hud.crouch.classList.toggle('show', ctl && !!h.cr);
+        if (!ctl && cfg.showAct) cfg.showAct(null);
+        if (h.end && !ended) { ended = true; hud.end.classList.add('show'); opts.onComplete && opts.onComplete(); }
+        // did a monster get you?
+        const kn = w.kl ? w.kl[mp.myKey()] || 0 : 0;
+        if (killSeen !== null && kn > killSeen) { killSeen = kn; if (!gdead) api.die(); }
+      },
+      die() {
+        gdead = true; sfx.scream(); hud.black.classList.remove('slow'); hud.black.classList.add('on'); if (cfg.showAct) cfg.showAct(null);
+        setTimeout(() => { if (gdead) hud.dead.classList.add('show'); }, 700);
+      },
+      dead: () => gdead,
+      respawn() {
+        if (!gdead) return;
+        gdead = false; hud.dead.classList.remove('show');
+        const w = api._s && api._s.w; if (w && w.hp) api.teleport(w.hp);
+        setTimeout(() => { hud.black.classList.add('slow'); hud.black.classList.remove('on'); setTimeout(() => hud.black.classList.remove('slow'), 900); }, 150);
+      },
+      // friend presses a button: the leader's game does it
+      sendAct(kind) { if (kind) mp.sendAct(kind); },
+      // friend walked into a story trigger: tell the leader (not more than once every 2 s)
+      once(kind) { const now = performance.now(); if (now - (onceT[kind] || -1e9) < 2000) return; onceT[kind] = now; mp.sendAct(kind); },
+      cutscene() { return !!(guest && api._s && camCut(api._s.w)); },
+      guests() {
+        if (guest) return [];
+        const now = performance.now(); if (!gCache || now - gCacheT > 8) { gCache = mp.guests(); gCacheT = now; }
+        return gCache;
+      },
+      // leader
+      lead(t, dt) {
+        const gs = api.guests();
+        for (const g of gs) {
+          if (!isFinite(g.x) || !isFinite(g.z)) continue;
+          const prev = gPrev[g.key]; g.mv = prev ? Math.hypot(g.x - prev.x, g.z - prev.z) / Math.max(1e-3, t - prev.t) : 0;
+          if (!prev || t - prev.t > .25) gPrev[g.key] = { x: g.x, z: g.z, t };
+          if (actSeen[g.key] === undefined) actSeen[g.key] = 0;
+          const q = actQ[g.key] || (actQ[g.key] = []);
+          if (g.ac) for (const [n, k] of g.ac) if (n > actSeen[g.key]) { actSeen[g.key] = n; q.push(k); }
+          // one press at a time, a moment apart, like real taps (two can arrive in one network update)
+          if (q.length && t - (actT[g.key] || -9) > .32) { actT[g.key] = t; const k = q.shift(); if (cfg.doAct) try { cfg.doAct(k, g); } catch (e) { console.error(e); } }
+          if (cfg.onGuest) try { cfg.onGuest(g, dt); } catch (e) { console.error(e); }
+          if (!g.dead && cfg.dangerAt && t - (killT[g.key] || -9) > 4) {
+            let hit = false; try { hit = cfg.dangerAt([g.x, g.y - (g.crouch ? .85 : 1.62), g.z], g); } catch (e) {}
+            if (hit) { killT[g.key] = t; kills[g.key] = (kills[g.key] || 0) + 1; pubT = -9; }
+          }
+        }
+        if (!gs.length || t - pubT < .12) return;
+        pubT = t;
+        const R = {};
+        for (const n in cfg.R) {
+          const v = coopPlain(cfg.R[n]);
+          if (v && !Array.isArray(v)) for (const k in SKIP[n]) delete v[k];
+          R[n] = v;
+        }
+        const mu = {}; for (const n in music) { const el = music[n].el; mu[n] = [el.paused ? 0 : 1, Math.round((el.currentTime || 0) * 10) / 10]; }
+        const has = (el, c) => !!(el && el.classList.contains(c));
+        const w = {
+          sq: ++sq, T: Math.round(st.t * 1000) / 1000, ph: st.phase, ctl: cfg.ctl() ? 1 : 0, R,
+          cam: { e: st.eye.map(x => Math.round(x * 100) / 100), y: Math.round(st.camYaw * 1000) / 1000, p: Math.round(st.camPitch * 1000) / 1000, u: st.camUp ? st.camUp.map(x => Math.round(x * 1000) / 1000) : null },
+          hp: [st.p.x, st.p.y || 0, st.p.z, st.p.yaw, st.crouch ? 1 : 0].map(x => Math.round(x * 100) / 100),
+          fx: fxLog.filter(e => st.t - e[3] < 1.5 && st.t >= e[3] - .01).map(e => [e[0], e[1], e[2]]), mu, kl: kills,
+          hud: {
+            o: has(hud.obj, 'show') ? hud.obj.textContent : '', oa: has(hud.obj, 'alarm') ? 1 : 0, ts: has(hud.toast, 'show') ? hud.toast.textContent : '',
+            red: has(hud.red, 'on') ? 1 : 0, bl: has(hud.black, 'on') ? 1 : 0, fl: flashN, end: has(hud.end, 'show') ? 1 : 0,
+            jp: has(hud.jump, 'show') ? 1 : 0, jb: has(hud.jump, 'big') ? 1 : 0, cr: has(hud.crouch, 'show') ? 1 : 0
+          }
+        };
+        mp.publish(w);
+      }
+    };
+    return api;
+  }
+
   /* ================= Clawrenzo (baked skinned model) ================= */
   function makeClaw(gl, data) {
     const meta = data.meta, raw = atob(data.b64), bytes = new Uint8Array(raw.length);
@@ -1204,6 +1528,7 @@
 
     /* ---- hud, audio ---- */
     const hud = makeHud(container);
+    const mpAv = opts.mp ? makeMpAvatars(gl, container) : null;
     const sfx = makeAudio(opts.getAC, opts.sfxOn || (() => true));
     const A = opts.audio || {};
     const musicVol = opts.musicVol || (() => 1), musicOn = opts.musicOn || (() => true);
@@ -1229,6 +1554,31 @@
     const mon = { state: 'off', x: 0, z: 0, yaw: 0, timer: 0, exposure: 0, animT: 0, clip: 'idle', stepT: 0, growlT: 0, warned: false, flee: null };
     const truckZ = () => TRUCK_Z0 - st.truckDist;
 
+    /* ---- playing together: the leader's game runs the story and the monsters, friends see the same ---- */
+    const coop = makeCoop(opts, st, hud, sfx, {
+      R: { st, mon },
+      skip: { mon: ['flee'] },
+      zone: () => st.area * 2 + (st.inSewer ? 1 : 0),
+      ctl: () => controlling(),
+      ownCam: ph => ph === 'visit' || ph === 'ride' || ph === 'crash',
+      music: { borrowed: A.borrowed, voice: A.voice ? { el: A.voice, loop: false } : null, ride: A.ride ? { el: A.ride, loop: false } : null,
+        buckle: A.buckle ? { el: A.buckle, loop: false } : null, mines: A.mines ? { el: A.mines, loop: false } : null },
+      dangerAt: (f, g) => g.area === 2 && st.area === 2 && st.inSewer && mon.state === 'hunt' && st.phase === 'explore' && Math.hypot(f[0] - mon.x, f[2] - mon.z) < 1.6,
+      onGuest: (g, dt) => {   // a friend's flashlight scares Clawrenzo too
+        if (st.area !== 2 || !st.inSewer || !st.hasLight || mon.state !== 'hunt' || g.dead || !isFinite(g.x)) return;
+        if (lightOnMonster([g.x, g.y, g.z], [Math.sin(g.yw), 0, -Math.cos(g.yw)])) mon.exposure += dt * 1.5;
+      },
+      doAct: (k) => {
+        if (k === 'hit' && st.phase === 'free' && !st.broken) doHit();
+        else if (k === 'in' && st.phase === 'alarm') getIn();
+        else if (k === 'enter' && st.phase === 'explore' && st.area === 2 && !st.inSewer) enterSewer();
+        else if (k === 'take' && st.phase === 'explore' && st.inSewer && !st.hasLight) takeLight();
+        else if (k === 'climb' && st.phase === 'explore' && st.inSewer) climbOut();
+      },
+      showAct: () => { actMode = ''; hud.act.classList.remove('show'); }
+    });
+    const G = !!(coop && coop.guest);
+    let gHits = -1;
     const later = (t, fn) => st.timers.push({ at: st.t + t, fn });
 
     /* ---- input ---- */
@@ -1236,7 +1586,7 @@
     let lookId = null, lx = 0, ly = 0;
     const keys = { f: 0, b: 0, l: 0, r: 0 };
     const KEYMAP = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
-    const controlling = () => st.phase === 'free' || st.phase === 'alarm' || st.phase === 'explore';
+    const controlling = () => (st.phase === 'free' || st.phase === 'alarm' || st.phase === 'explore') && !(G && coop.blocked());
     function resetJoy() { hud.joy.style.left = '96px'; hud.joy.style.top = Math.max(70, hud.zone.clientHeight - 104) + 'px'; hud.thumb.style.transform = ''; }
     resetJoy();
     const onZoneDown = e => {
@@ -1326,6 +1676,7 @@
       if (m) { hud.label.textContent = ACT_LABEL[m]; hud.pips.innerHTML = ''; if (m === 'hit') renderPips(); }
     }
     function onAct() {
+      if (G) { if (actMode && controlling()) coop.sendAct(actMode); return; }
       if (actMode === 'hit') doHit();
       else if (actMode === 'in') getIn();
       else if (actMode === 'enter') enterSewer();
@@ -1424,7 +1775,7 @@
       if (truckZ() - 3.4 <= MINE_Z + .2) startCrash(t);
     }
     function driverTalk() {
-      const el = st.rideAudio;
+      const el = st.rideAudio || (G && A.ride && !A.ride.paused ? A.ride : null);
       if (el) {
         if (el.paused) return [0, 0];
         const at = el.currentTime;
@@ -1500,6 +1851,7 @@
       return [cellX0(S_CELL[0]) + 1.0, cellC(...S_CELL)[1], Math.PI / 2];
     }
     function respawn() {
+      if (G) { coop.respawn(); return; }
       if (st.phase !== 'dead') return;
       const [x, z, yaw] = checkpoint();
       st.p.x = x; st.p.z = z; st.p.yaw = yaw; st.p.pitch = 0;
@@ -1825,16 +2177,21 @@
     }
     const I = M4.ident();
     function frame(t, noDraw) {
+      if (G) { const T = coop.time(t); if (T === null) return; t = T; }
       const dt = clamp(t - st.t, 0, .1); st.t = t;
       if (!noDraw && dt > 0) { emaDt = lerp(emaDt, dt, .05); if (t - lastScaleT > 1.5 && emaDt > .036 && resScale > .55) { resScale *= .85; lastScaleT = t; } }
-      for (let n = 0; n < 50; n++) { let k = -1; for (let i = 0; i < st.timers.length; i++) if (t >= st.timers[i].at && (k < 0 || st.timers[i].at < st.timers[k].at)) k = i; if (k < 0) break; const f = st.timers[k].fn; st.timers.splice(k, 1); f(); }   // earliest first, even on a slow frame
+      if (G) coop.apply(t);
+      else for (let n = 0; n < 50; n++) { let k = -1; for (let i = 0; i < st.timers.length; i++) if (t >= st.timers[i].at && (k < 0 || st.timers[i].at < st.timers[k].at)) k = i; if (k < 0) break; const f = st.timers[k].fn; st.timers.splice(k, 1); f(); }   // earliest first, even on a slow frame
       if (st.toastUntil && t > st.toastUntil) { hud.toast.classList.remove('show'); st.toastUntil = 0; }
 
-      if (st.area === 1) { updateA(t, dt); updateRide(t, dt); updateCrash(dt); }
+      if (st.area === 1 && !G) { updateA(t, dt); updateRide(t, dt); updateCrash(dt); }
       updatePlayer(t, dt);
-      updateMonster(t, dt);
+      if (!G) updateMonster(t, dt); else if (st.area === 2 && st.inSewer) ensureClaw();
+      if (G && st.hits !== gHits) { gHits = st.hits; if (actMode === 'hit') renderPips(); }
       if (st.area === 1) poseCitizens(t, dt);
-      updateCamera(t, dt);
+      if (!(G && coop.cutscene())) updateCamera(t, dt); if (G) coop.camera(t, dt);
+      if (opts.mp) opts.mp.report(st.eye, st.camYaw, st.area, false, st.phase === 'dead' || !!(G && coop.dead()));
+      if (coop) coop.post(t, dt);
       const talk = envAt(A.voice, envVoice);
       updateLights(t, talk);
 
@@ -2049,6 +2406,7 @@
         gl.useProgram(progW.p); gl.uniform1i(progW.u.uUseTex, 0); gl.uniform3fv(progW.u.uEmissive, [0, 0, 0]);
         gl.enable(gl.BLEND); gl.depthMask(false); gl.blendFunc(gl.ONE, gl.ONE);
       }
+      if (mpAv) { gl.useProgram(progW.p); gl.disable(gl.BLEND); gl.depthMask(true); gl.uniform1i(progW.u.uMode, 0); mpAv.draw(progW, VP, t, dt, controlling() ? opts.mp.peers() : [], st.area, camPos); }
       // additive glows
       gl.useProgram(progW.p); gl.enable(gl.BLEND); gl.depthMask(false); gl.blendFunc(gl.ONE, gl.ONE);
       gl.uniform1i(progW.u.uMode, 2); gl.bindVertexArray(sprite.vao);
@@ -2079,10 +2437,10 @@
         window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp);
         window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey); window.removeEventListener('blur', onBlur);
         for (const el of [A.voice, A.borrowed, A.buckle, A.mines]) if (el) { try { el.pause(); el.onended = null; el.onplaying = null; } catch (e) {} }
-        hud.root.remove();
+        hud.root.remove(); if (mpAv) mpAv.dispose();
         const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
       },
-      state: st, mon, _dbg: { beginFree, enterArea2, enterSewer, takeLight, monSpawn, startCrash, ensureClaw }, _frame: (t, nd) => frame(t, nd),
+      state: st, mon, coop, _dbg: { beginFree, enterArea2, enterSewer, takeLight, monSpawn, startCrash, ensureClaw }, _frame: (t, nd) => frame(t, nd),
       _debug: { sk, walkPose, sitPose, poseSkeleton, AX, jointMeshPos: n => jointMeshPos(sk, n) }
     };
   }
