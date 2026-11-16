@@ -429,6 +429,11 @@
     if (started) return; started = true;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
     getAC();
+    // unlock every chapter's sounds inside this first tap, so a friend can bring you into a chapter later and you still hear it
+    for (const el of [voice, $('#borrowed'), $('#ride'), $('#buckle'), $('#mines'), $('#croak'), $('#hand'), $('#senengeon')]) {
+      try { const p = el.play(); el.pause(); el.currentTime = 0; if (p && p.catch) p.catch(() => {}); } catch (e) {}
+    }
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
     fade = 0; applyMusic(); playMusic();   // must start inside the tap so phones allow it
     blackout.classList.add('tapped');
     await wait(700);
@@ -437,6 +442,7 @@
     fadeIn(3500);
     await wait(2600); stage.classList.add('title-in');
     await wait(1200); stage.classList.add('menu-in');
+    mpAutoFollow();
   }
   blackout.addEventListener('click', begin);
   blackout.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); begin(); } });
@@ -513,9 +519,14 @@
     2: 'Models: <a href="https://sketchfab.com/3d-models/hellish-banban-rigged-c65f6cbd26d24ac6a11511bca18cab83" target="_blank" rel="noopener">\u201cHellish Banban Rigged\u201d</a> and <a href="https://sketchfab.com/3d-models/sheriff-toadster-rigged-official-297ae0f93278413298f4f8c5b8811dbd" target="_blank" rel="noopener">\u201cSheriff Toadster Rigged Official\u201d</a> by nnneagu (simplified &amp; animated) \u00b7 <a href="https://sketchfab.com/3d-models/garten-of-banban-7-syringeon-5ff243faee14410888f72bd646ae5d75" target="_blank" rel="noopener">\u201cGarten of Banban 7 - Syringeon\u201d</a> and <a href="https://sketchfab.com/3d-models/naughtyones-garten-of-banban-6-fanmade-anims-f0c4120365064f2fad9935234f8a4d92" target="_blank" rel="noopener">\u201cNaughtyOnes - Garten of Banban 6\u201d</a> by nnneagu (simplified) \u00b7 <a href="https://sketchfab.com/3d-models/rope-knots-aa6380f3e5d442b1a1971d4cb1c88ccb" target="_blank" rel="noopener">\u201cRope Knots\u201d</a> by aneeqayounas \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>'
   };
   async function enterChapter1(){ return enterChapter(1); }
-  async function enterChapter(n){
+  async function enterChapter(n, L){
     if (inChapter) return;
-    inChapter = true; leaving = false; mpSetChapter(n);
+    inChapter = true; leaving = false;
+    // playing together: join the friend who is already in this chapter, otherwise you lead and your friends are brought along
+    if (!L && MP.named) { const cur = newestLeader(); if (cur && cur.ch === n) L = cur; }
+    if (L && MP.named) { MP.role = 'guest'; MP.leadKey = L.key; MP.leadAt = L.ld; }
+    else { MP.role = 'lead'; MP.myLd = serverNow(); }
+    mpSetChapter(n);
     $('#credit1').innerHTML = CREDITS[n];
     // unlock the chapter's sounds inside this tap so they may play later on phones
     const unlock = n === 1 ? [voice, $('#borrowed'), $('#ride'), $('#buckle'), $('#mines')] : n === 2 ? [$('#croak'), $('#hand'), $('#senengeon')] : [$('#borrowed')];
@@ -566,6 +577,7 @@
       canvas.remove();
       sceneMessage('Your device could not start the 3D scene', 'Back to menu', exitChapter); fadeEl.classList.remove('on'); return;
     }
+    window.__scene = scene;
     if (n === 1) loadScript('claw-data.js', () => !!window.CLAW_DATA).catch(() => {});
     else if (n === 3) ['kabob', 'bitter', 'josh', 'dadadoo'].reduce((pr, k) => pr.then(() => loadScript(k + '-data.js', () => !!window[SLEEPER_VARS[k]])).catch(() => {}), Promise.resolve());
     else loadScript('toad-data.js', () => !!window.TOAD_DATA).catch(() => {})
@@ -578,22 +590,27 @@
     setTimeout(() => sceneHint.classList.add('show'), 2600);
     setTimeout(() => sceneHint.classList.remove('show'), 7600);
   }
-  async function exitChapter(){
+  async function exitChapter(reason){
     if (!inChapter || leaving) return;
-    leaving = true; sfx('back');
+    leaving = true;
+    if (typeof reason !== 'string') reason = '';   // from a button: the player chose to leave
+    const next = reason === 'next';
+    if (MP.role === 'guest' && !reason) MP.declined = MP.leadAt;   // you chose to leave your friend's game: don't pull you back in
+    if (!next) sfx('back');
     fadeEl.classList.remove('slow'); fadeEl.classList.add('on');
     await wait(1250);
-    if (scene) { scene.stop(); scene = null; }
+    if (scene) { scene.stop(); scene = null; window.__scene = null; }
     // the ride track is Wheels of Freedom with the driver's line on top: hand over to the menu music at the same spot
     const ride = $('#ride'), ridePos = ride.paused ? -1 : ride.currentTime;
     for (const el of [voice, $('#borrowed'), $('#buckle'), $('#mines'), ride, $('#croak'), $('#hand'), $('#senengeon')]) { try { el.pause(); el.currentTime = 0; } catch (e) {} }
     try { speechSynthesis.cancel(); } catch (e) {}
-    if (ridePos >= 0 && S.music) { try { music.currentTime = ridePos; } catch (e) {} fade = 1; applyMusic(); playMusic(); }
+    if (ridePos >= 0 && S.music && !next) { try { music.currentTime = ridePos; } catch (e) {} fade = 1; applyMusic(); playMusic(); }
     sceneEl.querySelectorAll('canvas').forEach(c => c.remove());
     sceneEl.classList.remove('on'); sceneHint.classList.remove('show'); sceneMessage('');
     stage.style.visibility = '';
-    inChapter = false; mpSetChapter(0);
+    inChapter = false; MP.role = 'solo'; mpSetChapter(0);
     show('menu');
+    if (next) { leaving = false; return; }                  // going straight into a friend's chapter: stay dark
     if (!music.paused) { fade = 1; applyMusic(); }          // Wheels of Freedom is already playing from the ride
     else if (S.music) { fade = 0; applyMusic(); playMusic(); fadeIn(2500); }
     fadeEl.classList.add('slow'); fadeEl.classList.remove('on');
@@ -637,10 +654,11 @@
   const SITE_URL = (!ON_CLAUDE && /^https?:$/.test(location.protocol)) ? location.origin + location.pathname : ART_URL;
   const COLOR_NAMES = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange'];
   const mpEl = { link: $('#mpLink'), copy: $('#mpCopy'), gen: $('#mpGen'), join: $('#mpJoin'), follow: $('#mpFollow'), status: $('#mpStatus') };
-  const MP = { room: null, user: null, tried: false, named: null, code: null, others: [], names: {}, me: { ch: 0 }, last: null, lastT: 0, color: Math.floor(Math.random() * 6), current: 0 };
+  const MP = { room: null, user: null, tried: false, named: null, code: null, others: [], names: {}, me: { ch: 0 }, last: null, lastT: 0, color: Math.floor(Math.random() * 6), current: 0,
+    role: 'solo', leadKey: null, leadAt: 0, myLd: 0, declined: 0, frames: [], lastW: '', acts: [], meKey: null, switching: false, statusHtml: '' };
   const codeOf = text => { const m = String(text || '').toLowerCase().match(/(?:#mp-|\b)([a-z0-9]{6})\b/); return m ? m[1] : null; };
   const linkFor = code => (FIREBASE_CONFIG ? SITE_URL : ART_URL) + '#mp-' + code;
-  function mpStatus(html){ mpEl.status.innerHTML = html; }
+  function mpStatus(html){ if (html === MP.statusHtml) return; MP.statusHtml = html; mpEl.status.innerHTML = html; }
   // ---- Firebase transport: rooms/<name>/players/<id> = that player's state; removed when they leave ----
   let fbP = null;
   function loadFirebase(){
@@ -658,31 +676,53 @@
     if (!fb.apps.length) fb.initializeApp(FIREBASE_CONFIG);
     const db = fb.database(); let offset = 0;
     try { db.ref('.info/serverTimeOffset').on('value', s => { offset = s.val() || 0; }); } catch (e) {}
-    const pid = Math.random().toString(36).slice(2, 12);
+    const pid = Math.random().toString(36).slice(2, 12), TS = fb.database.ServerValue.TIMESTAMP;
     return {
+      now: () => Date.now() + offset,
       async join(name){
-        const ref = db.ref('rooms/' + name + '/players'), meRef = ref.child(pid);
-        let mine = {}, subs = [], errCbs = [], peers = [], hb = 0, writeT = 0, queued = false, left = false;
+        const ref = db.ref('rooms/' + name + '/players'), meRef = ref.child(pid), all = {};
+        let mine = {}, dirty = {}, full = true, subs = [], errCbs = [], peers = [], hb = 0, writeT = 0, queued = false, left = false;
         try { await meRef.onDisconnect().remove(); } catch (e) {}
-        const write = () => { if (left) return; writeT = Date.now(); queued = false; meRef.set(Object.assign({}, mine, { ts: fb.database.ServerValue.TIMESTAMP })).catch(() => {}); };
-        const onValue = snap => {
-          const now = Date.now() + offset, all = snap.val() || {};
+        // the first write (and any after a reconnect) sends everything; after that only what changed
+        const write = () => {
+          if (left) return; writeT = Date.now(); queued = false;
+          if (full) { full = false; dirty = {}; meRef.set(Object.assign({}, mine, { ts: TS })).catch(() => { full = true; }); return; }
+          const up = { ts: TS }; for (const k in dirty) up[k] = k in mine ? mine[k] : null; dirty = {};
+          meRef.update(up).catch(() => { full = true; });
+        };
+        const emit = () => {
+          const now = Date.now() + offset;
           peers = Object.keys(all).filter(k => k === pid || !all[k].ts || now - all[k].ts < 25000).map(k => ({ peer: k, by: null, isMe: k === pid, sameTab: k === pid, kind: 'viewer', guest: false, presence: all[k] }));
           for (const f of subs) f({ peers, joined: [], left: [], updated: [] });
         };
-        ref.on('value', onValue, err => { for (const e of errCbs) e({ code: 'upstream_error', message: String(err && err.message || err) }); });
-        hb = setInterval(write, 6000);
+        const onErr = err => { for (const e of errCbs) e({ code: 'upstream_error', message: String(err && err.message || err) }); };
+        const put = s => { all[s.key] = s.val() || {}; emit(); };
+        const rem = s => { delete all[s.key]; if (s.key === pid && !left) { full = true; write(); } emit(); };
+        ref.on('child_added', put, onErr); ref.on('child_changed', put, onErr); ref.on('child_removed', rem, onErr);
+        const conn = s => { if (s.val() && !left) { meRef.onDisconnect().remove().catch(() => {}); full = true; write(); } };
+        try { db.ref('.info/connected').on('value', conn); } catch (e) {}
+        hb = setInterval(() => { write(); emit(); }, 6000);
         return {
-          name,
+          name, me: pid,
           presence(patch){
-            for (const k in patch) { if (patch[k] === null) delete mine[k]; else mine[k] = patch[k]; }
+            for (const k in patch) {
+              const v = patch[k];
+              if (v === null || v === undefined) { if (k in mine) { delete mine[k]; dirty[k] = 1; } }
+              else if (typeof v === 'object' || mine[k] !== v) { mine[k] = v; dirty[k] = 1; }
+            }
             const gap = Date.now() - writeT;
             if (gap >= 90) write(); else if (!queued) { queued = true; setTimeout(write, 90 - gap); }
             return Promise.resolve();
           },
           onPeers(fn, onErr){ subs.push(fn); if (onErr) errCbs.push(onErr); setTimeout(() => fn({ peers, joined: peers, left: [], updated: [] }), 0); return () => { subs = subs.filter(f => f !== fn); }; },
           peers: () => peers,
-          async leave(){ left = true; clearInterval(hb); ref.off('value', onValue); try { await meRef.remove(); } catch (e) {} }
+          async leave(){
+            left = true; clearInterval(hb);
+            ref.off('child_added', put); ref.off('child_changed', put); ref.off('child_removed', rem);
+            try { db.ref('.info/connected').off('value', conn); } catch (e) {}
+            try { await meRef.onDisconnect().cancel(); } catch (e) {}
+            try { await meRef.remove(); } catch (e) {}
+          }
         };
       }
     };
@@ -717,10 +757,11 @@
   function renderMp(){
     if (!MP.named) { mpEl.follow.hidden = true; return; }
     const list = MP.others.map((p, i) => '<b>' + escapeHtml(nameOf(p, i)) + '</b>' + (p.presence && p.presence.ch ? ' (Chapter ' + (+p.presence.ch) + ')' : ' (menu)'));
+    if (Date.now() < (MP.noteUntil || 0)) return;
     mpStatus('Room <b>' + MP.code.toUpperCase() + '</b> · ' + (list.length ? 'with ' + list.join(', ') : 'waiting for your friend to open the link…'));
     // offer to follow a friend into the chapter they are playing
-    const f = !inChapter && MP.others.find(p => p.presence && +p.presence.ch >= 1 && +p.presence.ch <= 3);
-    if (f) { const i = MP.others.indexOf(f); mpEl.follow.hidden = false; mpEl.follow.textContent = 'JOIN ' + nameOf(f, i).toUpperCase() + ' IN CHAPTER ' + (+f.presence.ch); mpEl.follow.dataset.ch = +f.presence.ch; }
+    const L = !inChapter && newestLeader();
+    if (L) { const i = MP.others.indexOf(L.p); const t = 'JOIN ' + nameOf(L.p, i).toUpperCase() + ' IN CHAPTER ' + L.ch; if (mpEl.follow.textContent !== t) mpEl.follow.textContent = t; mpEl.follow.hidden = false; mpEl.follow.dataset.ch = L.ch; }
     else mpEl.follow.hidden = true;
   }
   function escapeHtml(t){ return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
@@ -730,11 +771,15 @@
     if (!room) { mpStatus(MP.why === 'firebase-load' ? 'Couldn\u2019t reach the multiplayer server. Check your internet and try again.' : 'Multiplayer isn\u2019t available on this copy of the game (' + (MP.why || 'offline') + ').'); return false; }
     try {
       if (MP.named) { try { await MP.named.leave(); } catch (e) {} MP.named = null; }
-      MP.named = await room.join('etp-' + code); MP.code = code; MP.others = [];
-      MP.named.onPeers(ch => { MP.others = ch.peers.filter(p => !p.isMe && p.kind === 'viewer'); renderMp(); resolveNames(); }, () => { MP.named = null; mpStatus('Lost the connection to the room. Generate or join again.'); });
+      MP.named = await room.join('etp-' + code); MP.code = code; MP.others = []; MP.meKey = MP.named.me || null;
+      MP.named.onPeers(ch => {
+        MP.others = ch.peers.filter(p => !p.isMe && p.kind === 'viewer');
+        const me = ch.peers.find(p => p.isMe); if (me) MP.meKey = me.peer;
+        mpTakeFrames(); renderMp(); resolveNames(); mpAutoFollow();
+      }, () => { MP.named = null; mpStatus('Lost the connection to the room. Generate or join again.'); });
       mpEl.link.value = linkFor(code); mpEl.copy.hidden = false; mpEl.join.hidden = true;
       try { history.replaceState(null, '', '#mp-' + code); } catch (e) { try { location.hash = 'mp-' + code; } catch (e2) {} }
-      MP.last = null; mpPresence({ ch: MP.current, a: 0, p: null, dead: 0 }); renderMp();
+      MP.last = null; mpPresence(mpChapterFields()); renderMp();
       return true;
     } catch (e) {
       MP.named = null;
@@ -746,9 +791,57 @@
     if (!MP.named) return;
     MP.named.presence(Object.assign({ v: 1, c: MP.color, nm: COLOR_NAMES[MP.color] + ' Explorer' }, patch)).catch(() => {});
   }
-  // the link handed to each chapter: report where you are, hear where your friends are
+  // ---- playing together: whoever starts a chapter leads it; everyone else in the room is brought along ----
+  const serverNow = () => (MP.named && MP.named.now) ? MP.named.now() : Date.now();
+  function newestLeader(){
+    let best = null;
+    for (const p of MP.others) {
+      const q = p.presence || {}, ch = +q.ch, ld = +q.ld || 0;
+      if (ld && ch >= 1 && ch <= 3 && !q.fo && (!best || ld > best.ld)) best = { key: p.peer, ch, ld, p };
+    }
+    return best;
+  }
+  function mpChapterFields(){
+    return { ch: MP.current, ld: MP.role === 'lead' ? MP.myLd : null, fo: MP.role === 'guest' ? MP.leadKey : null, ac: null, w: null };
+  }
+  function mpTakeFrames(){   // a friend: keep the leader's newest snapshots for the chapter to read
+    if (MP.role !== 'guest' || !inChapter) return;
+    const L = MP.others.find(p => p.peer === MP.leadKey), raw = L && L.presence && L.presence.w;
+    if (typeof raw !== 'string' || raw === MP.lastW) return;
+    MP.lastW = raw;
+    try { MP.frames.push({ w: JSON.parse(raw), at: performance.now() }); if (MP.frames.length > 12) MP.frames.shift(); } catch (e) {}
+  }
+  function mpAutoFollow(){
+    if (!MP.named || MP.switching || !started || leaving) return;
+    const L = newestLeader();
+    if (MP.role === 'guest' && inChapter) {
+      if (L && L.ld > MP.leadAt && L.ld !== MP.declined) { followInto(L); return; }   // someone started something newer: go there
+      const cur = MP.others.find(p => p.peer === MP.leadKey), q = (cur && cur.presence) || {};
+      if (!cur || +q.ch !== MP.current || +q.ld !== MP.leadAt) leaderGone();
+      return;
+    }
+    if (!L || L.ld === MP.declined) return;
+    if (inChapter && MP.role === 'lead' && MP.myLd >= L.ld) return;   // you started after them: they come to you
+    followInto(L);
+  }
+  async function followInto(L){
+    MP.switching = true;
+    try {
+      if (inChapter) await exitChapter('next');
+      if (!inChapter) { MP.declined = 0; await enterChapter(L.ch, L); }
+    } finally { MP.switching = false; }
+    setTimeout(mpAutoFollow, 50);
+  }
+  function leaderGone(){
+    MP.switching = true;
+    exitChapter('gone').finally(() => { MP.switching = false; mpStatus('Your friend left the chapter, so you are back in the menu.'); MP.noteUntil = Date.now() + 6000; setTimeout(renderMp, 6100); });
+  }
+  // the link handed to each chapter
   function mpLink(n){
     return {
+      coop: true,
+      isGuest: () => MP.role === 'guest',
+      myKey: () => MP.meKey,
       report(eye, yaw, area, crouch, dead){
         if (!MP.named) return;
         const now = performance.now(); if (now - MP.lastT < 90) return;
@@ -767,10 +860,30 @@
           out.push({ key: p.peer, name: nameOf(p, i), color: (+q.c || 0) % 6, area: +q.a || 1, x, y, z, yw: +q.y || 0, crouch: !!q.cr, dead: !!q.dead });
         });
         return out;
+      },
+      // leader: the friends who are playing in your game
+      guests(){
+        if (!MP.named || MP.role !== 'lead') return [];
+        const out = [];
+        MP.others.forEach((p, i) => {
+          const q = p.presence || {};
+          if (+q.ch !== n || q.fo !== MP.meKey) return;
+          const [x, y, z] = (Array.isArray(q.p) && q.p.length === 3) ? q.p.map(Number) : [NaN, NaN, NaN];   // not placed yet: still send them the world
+          let ac = null; if (typeof q.ac === 'string') try { ac = JSON.parse(q.ac); } catch (e) {}
+          out.push({ key: p.peer, name: nameOf(p, i), area: +q.a || 1, x, y, z, yw: +q.y || 0, crouch: !!q.cr, dead: !!q.dead, ac: Array.isArray(ac) ? ac : null });
+        });
+        return out;
+      },
+      publish(w){ if (MP.named && MP.role === 'lead') mpPresence({ w: JSON.stringify(w) }); },
+      hostFrames(){ mpTakeFrames(); const f = MP.frames; MP.frames = []; return f; },
+      sendAct(kind){
+        const t = Math.max(Date.now(), (MP.acts.length ? MP.acts[MP.acts.length - 1][0] + 1 : 0));
+        MP.acts.push([t, String(kind)]); if (MP.acts.length > 6) MP.acts.shift();
+        mpPresence({ ac: JSON.stringify(MP.acts) });
       }
     };
   }
-  function mpSetChapter(n){ MP.current = n; MP.last = null; mpPresence({ ch: n, p: null, dead: 0 }); renderMp(); }
+  function mpSetChapter(n){ MP.current = n; MP.last = null; MP.acts = []; MP.frames = []; MP.lastW = ''; mpPresence(Object.assign(mpChapterFields(), { p: null, dead: 0 })); renderMp(); }
   mpEl.gen.addEventListener('click', async () => {
     sfx('select');
     const abc = 'abcdefghjkmnpqrstuvwxyz23456789'; let code = '';
@@ -792,7 +905,7 @@
   });
   mpEl.link.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const c = codeOf(mpEl.link.value); if (c) mpJoin(c); } });
   mpEl.join.addEventListener('click', () => { const c = codeOf(mpEl.link.value); if (c) { sfx('select'); mpJoin(c); } });
-  mpEl.follow.addEventListener('click', () => { const n = +mpEl.follow.dataset.ch; if (n >= 1 && n <= 3 && !inChapter) { sfx('select'); enterChapter(n); } });
+  mpEl.follow.addEventListener('click', () => { const L = newestLeader(); if (L && !inChapter) { sfx('select'); MP.declined = 0; followInto(L); } });
   // opened from a friend's link (#mp-xxxxxx): join their room straight away
   { const c = /^#mp-([a-z0-9]{6})$/.test(location.hash) ? location.hash.slice(4) : null; if (c) { mpEl.link.value = linkFor(c); mpJoin(c); } }
 
