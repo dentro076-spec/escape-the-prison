@@ -632,7 +632,7 @@
   /* ---------- multiplayer: a named room per code, players share where they are via presence ---------- */
   const ART_URL = 'https://claude.ai/artifact/3ZKAVf1QdznvuedoTvYBHn';
   // On its own website the game uses Firebase for multiplayer; the deploy step fills this in.
-  const FIREBASE_CONFIG = null; /*FIREBASE_CONFIG*/
+  const FIREBASE_CONFIG = {"apiKey": "AIzaSyBB7nKujGimy5ys3SU-X8Be9N_KSXDaPbA", "authDomain": "escape-the-prison-d6364.firebaseapp.com", "databaseURL": "https://escape-the-prison-d6364-default-rtdb.firebaseio.com", "projectId": "escape-the-prison-d6364", "storageBucket": "escape-the-prison-d6364.firebasestorage.app", "messagingSenderId": "23101186857", "appId": "1:23101186857:web:48f72f62cc26552c22cd38"};
   const ON_CLAUDE = /claude|anthropic/.test(location.hostname);
   const SITE_URL = (!ON_CLAUDE && /^https?:$/.test(location.protocol)) ? location.origin + location.pathname : ART_URL;
   const COLOR_NAMES = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange'];
