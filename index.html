@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escape the prison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --orange:#ff9443;
+    --orange-deep:#d9621f;
+    --teal:#93d8c6;
+    --ink:#140a05;
+    --bone:#f1e8d8;
+    --muted:#8d847a;
+    --b:1;
+    --pad:clamp(22px,6vw,96px);
+    --display:'Luckiest Guy','Impact',system-ui,sans-serif;
+    --text:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#000;overflow:hidden}
+  body{color:var(--bone);font-family:var(--text);-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  button:focus{outline:none}
+
+  #stage{position:fixed;inset:0;overflow:hidden;background:#000}
+
+  /* ---------- background photo ---------- */
+  .bg{position:absolute;inset:-4%;opacity:0;transition:opacity 3.4s ease .5s;animation:drift 38s ease-in-out infinite alternate}
+  .revealed .bg{opacity:1}
+  .bg-img{position:absolute;inset:0;background:url(bg.jpg) center/cover no-repeat;transform:scale(1.16);transition:transform 10s cubic-bezier(.2,.6,.2,1);filter:brightness(var(--b))}
+  .revealed .bg-img{transform:scale(1.03)}
+  @keyframes drift{from{transform:translate3d(0,0,0)}to{transform:translate3d(-1.6%,1.1%,0)}}
+  @media (orientation:portrait){.bg-img{background-position:80% center}}
+
+  .fog{position:absolute;inset:-25%;pointer-events:none;opacity:0;transition:opacity 5s ease 1.5s;
+    background:
+      radial-gradient(38% 28% at 28% 62%,rgba(210,200,190,.10),transparent 70%),
+      radial-gradient(30% 22% at 72% 38%,rgba(255,140,70,.08),transparent 70%),
+      radial-gradient(45% 30% at 55% 85%,rgba(160,190,180,.07),transparent 70%);
+    animation:fog 24s ease-in-out infinite alternate}
+  .revealed .fog{opacity:1}
+  @keyframes fog{from{transform:translate3d(-4%,0,0)}to{transform:translate3d(4%,-2%,0)}}
+
+  .shade{position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(ellipse at 60% 50%,transparent 35%,rgba(0,0,0,.78) 100%),
+      linear-gradient(90deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.25) 38%,transparent 60%)}
+  .flicker{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;animation:flick 11s infinite}
+  @keyframes flick{0%,88%{opacity:0}88.6%{opacity:.42}89.2%{opacity:0}90%{opacity:.6}91.4%{opacity:0}100%{opacity:0}}
+  .grain{position:absolute;inset:-60%;pointer-events:none;opacity:.09;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    animation:grain .8s steps(5) infinite}
+  @keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-6%,4%)}40%{transform:translate(5%,-3%)}60%{transform:translate(-3%,-6%)}80%{transform:translate(6%,5%)}100%{transform:translate(0,0)}}
+
+  /* ---------- black intro screen ---------- */
+  #blackout{position:absolute;inset:0;z-index:50;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;cursor:pointer;transition:opacity 2.8s ease .6s}
+  #blackout.gone{opacity:0;pointer-events:none}
+  #start{font-weight:700;font-size:clamp(15px,2.2vw,21px);letter-spacing:.55em;text-indent:.55em;text-transform:uppercase;color:#bdb2a2;padding:22px 30px;animation:pulse 2.6s ease-in-out infinite;transition:opacity .5s}
+  .hint{font-weight:500;font-size:clamp(12px,1.4vw,14px);letter-spacing:.3em;text-indent:.3em;text-transform:uppercase;color:#4d463f;transition:opacity .5s}
+  #blackout.tapped #start,#blackout.tapped .hint{opacity:0;animation:none}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+  /* ---------- screens ---------- */
+  #ui{position:absolute;inset:0;z-index:10}
+  .screen{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .45s ease,visibility 0s linear .45s}
+  .screen.active{opacity:1;visibility:visible;transition:opacity .45s ease}
+
+  /* main menu */
+  #menu{display:flex;flex-direction:column;align-items:flex-start;padding:clamp(30px,9vh,110px) var(--pad) 40px;overflow-y:auto;overscroll-behavior:contain}
+  .title{font-family:var(--display);font-weight:400;line-height:.86;opacity:0;transform:translateY(-16px);transition:opacity 1.8s ease,transform 1.8s ease}
+  .title-in .title{opacity:1;transform:none}
+  .title .t1,.title .t2{display:block;white-space:nowrap;-webkit-text-stroke:.1em var(--ink);paint-order:stroke fill}
+  .t1{font-size:clamp(58px,11.5vw,156px);color:var(--orange);text-shadow:0 .07em 0 var(--ink),0 0 .6em rgba(255,120,40,.35);animation:titleFlick 9s infinite}
+  .t2{font-size:clamp(34px,6.7vw,92px);color:var(--teal);text-shadow:0 .08em 0 var(--ink),0 0 .6em rgba(110,200,180,.25);margin-top:.06em;margin-left:.06em}
+  .wobble span{display:inline-block;transform:translateY(var(--y)) rotate(var(--r));animation:bob 4.2s ease-in-out var(--d) infinite}
+  @keyframes bob{0%,100%{translate:0 0}50%{translate:0 -.035em}}
+  @keyframes titleFlick{0%,93%{opacity:1}93.5%{opacity:.55}94%{opacity:1}94.6%{opacity:.7}95.2%{opacity:1}}
+
+  nav{margin-top:clamp(26px,7vh,84px);display:flex;flex-direction:column;gap:clamp(4px,1.2vh,12px)}
+  nav .item{opacity:0}
+  .menu-in nav .item{animation:slideIn .8s cubic-bezier(.2,.8,.2,1) calc(var(--i)*.16s) both}
+  @keyframes slideIn{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+  .menu-btn{position:relative;display:block;font-family:var(--display);font-size:clamp(32px,4.6vw,60px);letter-spacing:.04em;line-height:1;padding:.14em .2em .04em .15em;color:var(--bone);-webkit-text-stroke:.09em var(--ink);paint-order:stroke fill;text-shadow:0 .07em 0 var(--ink);transition:transform .28s cubic-bezier(.3,1.6,.5,1),color .18s}
+  .menu-btn::before{content:"";position:absolute;left:-.5em;top:50%;border-left:.36em solid var(--orange);border-top:.22em solid transparent;border-bottom:.22em solid transparent;transform:translateY(-50%) scale(0);transition:transform .22s cubic-bezier(.3,1.6,.5,1);filter:drop-shadow(0 2px 0 var(--ink))}
+  .menu-btn:hover,.menu-btn:focus-visible{color:var(--orange);transform:translateX(.4em) rotate(-1.5deg)}
+  .mp{margin:clamp(6px,1.6vh,14px) 0 0 .15em;display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:min(86vw,440px)}
+  .mp-box{display:flex;align-items:center;width:100%;background:rgba(10,7,5,.72);border:2px solid #4a3527;border-radius:12px;box-shadow:0 4px 0 var(--ink);overflow:hidden}
+  .mp-box input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--bone);font:600 15px/1.2 var(--text);letter-spacing:.02em;padding:12px 12px;-webkit-user-select:text;user-select:text}
+  .mp-box input::placeholder{color:#8d847a}
+  .mp-box button{flex:none;font-family:var(--display);font-size:16px;letter-spacing:.05em;color:var(--ink);background:var(--teal);padding:12px 14px 9px;border-left:2px solid #4a3527}
+  .mp-box button[hidden]{display:none}
+  .mp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .mp-gen,.mp-join,.mp-follow{font-family:var(--display);font-size:clamp(18px,2.2vw,22px);letter-spacing:.05em;color:var(--ink);background:var(--orange);border-radius:999px;padding:.5em 1em .32em;box-shadow:0 4px 0 var(--ink);transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+  .mp-gen:active,.mp-join:active,.mp-follow:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+  .mp-join{background:var(--teal)}
+  .mp-follow{background:#c3a6ff}
+  .mp-join[hidden],.mp-follow[hidden]{display:none}
+  .mp-status{font-size:13px;letter-spacing:.06em;color:#b9ada0;line-height:1.35;max-width:100%;text-shadow:0 1px 0 #000}
+  .mp-status b{color:var(--bone);font-weight:700}
+  .menu-btn:hover::before,.menu-btn:focus-visible::before{transform:translateY(-50%) scale(1)}
+  .menu-btn:active{transform:translateX(.4em) scale(.95)}
+
+  /* shared headings + back */
+  .screen-title{font-family:var(--display);font-weight:400;font-size:clamp(30px,4.6vw,56px);letter-spacing:.04em;color:var(--bone);-webkit-text-stroke:.09em var(--ink);paint-order:stroke fill;text-shadow:0 .07em 0 var(--ink);text-align:center}
+  .screen-title em{font-style:normal;color:var(--orange)}
+  .back{position:absolute;left:var(--pad);bottom:clamp(18px,5vh,48px);font-family:var(--display);font-size:clamp(22px,2.6vw,32px);letter-spacing:.05em;color:var(--bone);-webkit-text-stroke:.09em var(--ink);paint-order:stroke fill;text-shadow:0 .07em 0 var(--ink);padding:.2em .3em .1em;transition:color .18s,transform .25s cubic-bezier(.3,1.6,.5,1)}
+  .back:hover,.back:focus-visible{color:var(--orange);transform:translateX(-.25em)}
+  .back .arr{display:inline-block;font-size:.7em;vertical-align:.12em;margin-right:.3em}
+
+  /* chapter select */
+  #chapters{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(16px,4.5vh,44px);padding:24px 20px clamp(70px,12vh,120px);background:radial-gradient(ellipse at center,rgba(0,0,0,.35),rgba(0,0,0,.78))}
+  .cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:clamp(10px,1.5vw,22px);width:min(94vw,1240px);max-height:calc(100% - clamp(150px,26vh,230px));overflow-y:auto;overscroll-behavior:contain;padding:10px 8px 16px;scrollbar-width:thin;scrollbar-color:#3a2a1f transparent}
+  .card{position:relative;display:block;width:100%;aspect-ratio:16/10;border-radius:clamp(12px,1.4vw,18px);overflow:hidden;background:#0d0a08;border:3px solid #3a2a1f;box-shadow:0 18px 44px rgba(0,0,0,.65);text-align:left;transition:transform .28s cubic-bezier(.3,1.5,.5,1),border-color .2s,box-shadow .25s}
+  .card .thumb{position:absolute;inset:0;background:url(bg.jpg) 72% 62%/cover no-repeat;transition:transform .7s ease}
+  .card .label{position:absolute;left:0;right:0;bottom:0;padding:clamp(18px,3vh,30px) clamp(8px,1.2vw,16px) clamp(7px,1.2vh,12px);background:linear-gradient(transparent,rgba(0,0,0,.9));display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .card .num{white-space:nowrap;font-family:var(--display);font-size:clamp(15px,1.8vw,26px);letter-spacing:.04em;line-height:1;color:var(--bone);-webkit-text-stroke:.08em var(--ink);paint-order:stroke fill;text-shadow:0 .07em 0 var(--ink)}
+  .card .num b{font-weight:400;color:var(--orange)}
+  .card:not(.locked):hover,.card:not(.locked):focus-visible{border-color:var(--orange);transform:translateY(-6px) rotate(-.8deg);box-shadow:0 0 0 5px rgba(255,148,67,.16),0 24px 54px rgba(0,0,0,.7),0 0 46px rgba(255,148,67,.28)}
+  .card:not(.locked):hover .thumb,.card:not(.locked):focus-visible .thumb{transform:scale(1.07)}
+  .card.pressed{animation:press .38s ease}
+  @keyframes press{0%{transform:scale(1)}35%{transform:scale(.95)}70%{transform:scale(1.02)}100%{transform:scale(1)}}
+
+  .card .thumb2{background-position:34% 38%;filter:hue-rotate(-75deg) saturate(1.7) brightness(.75) contrast(1.1)}
+  .card .thumb3{background-position:62% 30%;filter:hue-rotate(150deg) saturate(1.6) brightness(.72) contrast(1.15)}
+  .card.locked{cursor:not-allowed;border-color:#262626;box-shadow:0 18px 44px rgba(0,0,0,.6)}
+  .card.locked .thumb{background-position:18% 55%;filter:grayscale(1) brightness(.28) blur(2px);transform:scale(1.08)}
+  .card.locked .thumb::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 12px,transparent 12px 24px)}
+  .card .lockwrap{display:none}
+  .card.locked .lockwrap{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:clamp(5px,1vh,10px)}
+  .card.locked .lock{width:clamp(20px,2.4vw,34px);color:#6f6f6f;filter:drop-shadow(0 3px 0 #000)}
+  .card.locked .num{color:#7b7b7b}
+  .soon{font-weight:700;font-size:clamp(9px,.95vw,12px);letter-spacing:.18em;text-transform:uppercase;color:#b9b9b9;border:1.5px solid #5b5b5b;border-radius:6px;padding:.38em .55em .32em .75em;background:rgba(0,0,0,.55);white-space:nowrap}
+  .card.shake{animation:shake .42s ease}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+
+  /* settings */
+  #settings{display:flex;align-items:center;justify-content:center;padding:20px 20px clamp(70px,12vh,120px);background:radial-gradient(ellipse at center,rgba(0,0,0,.35),rgba(0,0,0,.78))}
+  .panel{width:min(94vw,540px);background:rgba(14,10,8,.86);border:2px solid #3a2a1f;border-radius:20px;padding:clamp(18px,3.4vh,30px) clamp(18px,3vw,32px) clamp(14px,2.6vh,24px);box-shadow:0 24px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.04);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);position:relative}
+  .panel::before{content:"";position:absolute;left:24px;right:24px;top:-2px;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--orange),transparent)}
+  .panel .screen-title{margin-bottom:clamp(8px,2vh,18px)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:clamp(10px,1.9vh,15px) 2px;border-top:1px solid rgba(255,255,255,.07)}
+  .row > span,.row > label{white-space:nowrap;font-weight:600;font-size:clamp(17px,1.9vw,21px);letter-spacing:.12em;text-transform:uppercase;color:#d8cfc0}
+  .ctl{display:flex;align-items:center;gap:12px;flex:0 1 230px}
+  .ctl output{min-width:3ch;text-align:right;font-weight:700;font-size:18px;color:var(--orange);font-variant-numeric:tabular-nums}
+  .note{font-weight:500;font-size:15px;color:var(--muted);text-align:right;max-width:200px}
+  input[type=range]{--p:50%;-webkit-appearance:none;appearance:none;flex:1;height:8px;border-radius:8px;background:linear-gradient(90deg,var(--orange) var(--p),#2c221c var(--p));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--bone);border:3px solid var(--ink);box-shadow:0 0 0 3px rgba(255,148,67,.35)}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--bone);border:3px solid var(--ink);box-shadow:0 0 0 3px rgba(255,148,67,.35)}
+  input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 5px rgba(255,148,67,.6)}
+  .toggle{min-width:84px;padding:8px 14px 6px;border-radius:999px;font-family:var(--display);font-size:18px;letter-spacing:.08em;border:2px solid #4a3a2e;background:#1f1813;color:var(--muted);transition:background .2s,color .2s,border-color .2s}
+  .toggle[aria-pressed="true"]{background:var(--orange);border-color:var(--orange);color:var(--ink)}
+  .toggle:focus-visible{box-shadow:0 0 0 3px rgba(255,148,67,.5)}
+  .reset{display:block;margin:clamp(10px,2vh,16px) auto 0;font-weight:600;font-size:15px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding:8px 12px;transition:color .2s}
+  .reset:hover,.reset:focus-visible{color:var(--bone)}
+
+  /* phones */
+  @media (orientation:portrait){
+    .cards{grid-template-columns:repeat(2,minmax(0,1fr));width:min(94vw,560px)}
+    .card .num{font-size:clamp(15px,4.4vw,22px)}
+    .soon{font-size:clamp(9px,2.4vw,11px)}
+    .card.locked .lock{width:clamp(20px,6vw,30px)}
+    .t1{font-size:min(17vw,120px)}
+    .t2{font-size:min(10.2vw,72px)}
+    .menu-btn{font-size:clamp(34px,9.5vw,60px)}
+    .shade{background:radial-gradient(ellipse at 50% 55%,transparent 30%,rgba(0,0,0,.8) 100%),linear-gradient(180deg,rgba(0,0,0,.6) 0%,rgba(0,0,0,.15) 45%,transparent 65%)}
+  }
+  @media (max-height:460px){
+    #menu{padding-top:22px}
+    nav{margin-top:16px}
+    .t1{font-size:clamp(48px,9vw,80px)}
+    .t2{font-size:clamp(28px,5.4vw,48px)}
+    .menu-btn{font-size:32px}
+    .cards{max-height:calc(100% - 120px);gap:10px}
+    .row{padding:7px 2px}
+    .panel{padding-top:12px}
+    .panel .screen-title{font-size:28px;margin-bottom:4px}
+  }
+
+  /* ---------- chapter 1 scene ---------- */
+  #scene{position:fixed;inset:0;z-index:70;background:#000;display:none}
+  #scene.on{display:block}
+  #scene canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+  #scene canvas:active{cursor:grabbing}
+  .hud-back{position:absolute;left:clamp(14px,3vw,30px);top:clamp(12px,2.6vh,26px);font-family:var(--display);font-size:clamp(18px,2vw,24px);letter-spacing:.06em;color:var(--bone);-webkit-text-stroke:.09em var(--ink);paint-order:stroke fill;text-shadow:0 .07em 0 var(--ink);padding:.3em .4em .2em;opacity:.45;transition:opacity .3s,color .2s,transform .25s cubic-bezier(.3,1.6,.5,1)}
+  .hud-back:hover,.hud-back:focus-visible{opacity:1;color:var(--orange)}
+  .hud-back .arr{display:inline-block;font-size:.7em;vertical-align:.12em;margin-right:.3em}
+  .hud-back.done{opacity:1;animation:pulse 2s ease-in-out infinite}
+  .hud-hint{position:absolute;left:50%;bottom:clamp(56px,12vh,96px);transform:translateX(-50%);font-weight:600;font-size:14px;letter-spacing:.3em;text-indent:.3em;text-transform:uppercase;color:#a49a8c;opacity:0;transition:opacity 1.2s;pointer-events:none;white-space:nowrap}
+  .hud-hint.show{opacity:.75}
+  .hud-credit{position:absolute;right:10px;bottom:8px;font-size:11px;letter-spacing:.03em;color:#6c655d;max-width:70vw;text-align:right}
+  .hud-credit a{color:inherit}
+  .hud-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;align-items:center;gap:14px;text-align:center;font-weight:600;font-size:18px;letter-spacing:.12em;text-transform:uppercase;color:var(--bone)}
+  .hud-msg.show{display:flex}
+  .hud-msg button{font-family:var(--display);font-size:24px;letter-spacing:.06em;color:var(--ink);background:var(--orange);border-radius:999px;padding:.45em 1em .3em}
+  #fade{position:fixed;inset:0;z-index:90;background:#000;opacity:0;pointer-events:none;transition:opacity 1.2s ease;display:flex;align-items:flex-end;justify-content:center}
+  #fade.on{opacity:1;pointer-events:auto}
+  #fade.slow{transition-duration:2.4s}
+  #fade span{margin-bottom:12vh;font-weight:600;font-size:13px;letter-spacing:.4em;text-indent:.4em;text-transform:uppercase;color:#4d463f;opacity:0;transition:opacity .4s}
+  #fade.loading span{opacity:1;animation:pulse 1.6s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .bg,.fog,.grain,.flicker,.t1,.wobble span{animation:none}
+  }
+</style>
+</head>
+<body>
+<div id="stage" data-screen="menu">
+  <div class="bg"><div class="bg-img"></div></div>
+  <div class="fog"></div>
+  <div class="shade"></div>
+  <div class="flicker"></div>
+  <div class="grain"></div>
+
+  <main id="ui">
+    <!-- MAIN MENU -->
+    <section id="menu" class="screen active" aria-label="Main menu">
+      <h1 class="title" aria-label="Escape the prison">
+        <span class="t1 wobble">ESCAPE</span>
+        <span class="t2 wobble">THE PRISON</span>
+      </h1>
+      <nav>
+        <div class="item" style="--i:0"><button class="menu-btn" data-go="chapters">PLAY</button></div>
+        <div class="item" style="--i:1"><button class="menu-btn" data-go="settings">SETTINGS</button></div>
+        <div class="item" style="--i:2"><div class="mp" aria-label="Multiplayer">
+          <div class="mp-box"><input id="mpLink" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Play with a friend: generate a code, or paste their link" aria-label="Multiplayer link"><button id="mpCopy" type="button" hidden>COPY</button></div>
+          <div class="mp-row"><button class="mp-gen" id="mpGen" type="button">GENERATE CODE</button><button class="mp-join" id="mpJoin" type="button" hidden>JOIN</button><button class="mp-follow" id="mpFollow" type="button" hidden></button></div>
+          <p class="mp-status" id="mpStatus"></p>
+        </div></div>
+      </nav>
+    </section>
+
+    <!-- CHAPTER SELECT -->
+    <section id="chapters" class="screen" aria-label="Select chapter">
+      <h2 class="screen-title">SELECT <em>CHAPTER</em></h2>
+      <div class="cards">
+        <button class="card" id="ch1" aria-label="Chapter 1">
+          <span class="thumb"></span>
+          <span class="label"><span class="num">CHAPTER <b>1</b></span></span>
+        </button>
+        <button class="card" id="ch2" aria-label="Chapter 2">
+          <span class="thumb thumb2"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Finish Chapter 1</span></span>
+          <span class="label"><span class="num">CHAPTER <b>2</b></span></span>
+        </button>
+        <button class="card" id="ch3" aria-label="Chapter 3">
+          <span class="thumb thumb3"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Finish Chapter 2</span></span>
+          <span class="label"><span class="num">CHAPTER <b>3</b></span></span>
+        </button>
+        <button class="card locked" data-ch="4" aria-disabled="true" aria-label="Chapter 4, coming soon">
+          <span class="thumb" style="background-position:55% 20%"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="label"><span class="num">CHAPTER 4</span></span>
+        </button>
+        <button class="card locked" data-ch="5" aria-disabled="true" aria-label="Chapter 5, coming soon">
+          <span class="thumb" style="background-position:85% 75%"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="label"><span class="num">CHAPTER 5</span></span>
+        </button>
+        <button class="card locked" data-ch="6" aria-disabled="true" aria-label="Chapter 6, coming soon">
+          <span class="thumb" style="background-position:30% 30%"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="label"><span class="num">CHAPTER 6</span></span>
+        </button>
+        <button class="card locked" data-ch="7" aria-disabled="true" aria-label="Chapter 7, coming soon">
+          <span class="thumb" style="background-position:70% 50%"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="label"><span class="num">CHAPTER 7</span></span>
+        </button>
+        <button class="card locked" data-ch="8" aria-disabled="true" aria-label="Chapter 8, coming soon">
+          <span class="thumb" style="background-position:5% 30%"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="label"><span class="num">CHAPTER 8</span></span>
+        </button>
+        <button class="card locked" data-ch="9" aria-disabled="true" aria-label="Chapter 9, coming soon">
+          <span class="thumb" style="background-position:45% 85%"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="label"><span class="num">CHAPTER 9</span></span>
+        </button>
+        <button class="card locked" data-ch="10" aria-disabled="true" aria-label="Chapter 10, coming soon">
+          <span class="thumb" style="background-position:95% 20%"></span>
+          <span class="lockwrap"><svg class="lock" viewBox="0 0 48 56" fill="none" aria-hidden="true"><path d="M12 24V16a12 12 0 0 1 24 0v8" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><rect x="4" y="23" width="40" height="31" rx="7" fill="currentColor"/><circle cx="24" cy="36" r="4.5" fill="#141414"/><rect x="21.6" y="37" width="4.8" height="9" rx="2.4" fill="#141414"/></svg><span class="soon">Coming soon</span></span>
+          <span class="label"><span class="num">CHAPTER 10</span></span>
+        </button>
+      </div>
+      <button class="back" data-go="menu"><span class="arr">◀</span>BACK</button>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settings" class="screen" aria-label="Settings">
+      <div class="panel">
+        <h2 class="screen-title">SETTINGS</h2>
+        <div class="row" id="volRow">
+          <label for="vol">Music volume</label>
+          <div class="ctl"><input type="range" id="vol" min="0" max="100" step="1"><output id="volOut" for="vol"></output></div>
+        </div>
+        <div class="row">
+          <span>Music</span>
+          <button class="toggle" id="musicT" aria-pressed="true">ON</button>
+        </div>
+        <div class="row">
+          <span>Sound effects</span>
+          <button class="toggle" id="sfxT" aria-pressed="true">ON</button>
+        </div>
+        <div class="row">
+          <label for="bri">Brightness</label>
+          <div class="ctl"><input type="range" id="bri" min="50" max="150" step="1"><output id="briOut" for="bri"></output></div>
+        </div>
+        <button class="reset" id="reset">Reset to default</button>
+      </div>
+      <button class="back" data-go="menu"><span class="arr">◀</span>BACK</button>
+    </section>
+  </main>
+
+  <!-- BLACK INTRO -->
+  <div id="blackout" role="button" tabindex="0" aria-label="Tap to start">
+    <span id="start">Tap to start</span>
+    <span class="hint">Sound on</span>
+  </div>
+</div>
+
+
+<!-- CHAPTER 1 SCENE -->
+<div id="scene" aria-label="Chapter 1">
+  <button class="hud-back" id="sceneBack"><span class="arr">◀</span>MENU</button>
+  <div class="hud-hint" id="sceneHint">Drag to look around</div>
+  <div class="hud-msg" id="sceneMsg"></div>
+  <div class="hud-credit" id="credit1">Models: <a href="https://sketchfab.com/3d-models/garten-of-banban-givanium-citizen-773450d2289f4f1eb744532ce1f9b0ae" target="_blank" rel="noopener">“Garten of Banban | Givanium Citizen”</a> by SquishyFishyFish (recoloured &amp; animated) · <a href="https://sketchfab.com/3d-models/clawrenzo-garten-of-banban-8-eae69f7b741e445d875d834352c732a9" target="_blank" rel="noopener">“Clawrenzo - Garten of Banban 8”</a> by lesvink — <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></div>
+</div>
+<div id="fade"><span>Loading</span></div>
+
+<audio id="music" src="music.mp3" loop preload="auto"></audio>
+<audio id="voice" src="voice.mp3" preload="auto"></audio>
+<audio id="borrowed" src="borrowed.mp3" loop preload="auto"></audio>
+<audio id="buckle" src="buckle.mp3" preload="auto"></audio>
+<audio id="ride" src="ride.mp3" preload="auto"></audio>
+<audio id="mines" src="mines.mp3" preload="auto"></audio>
+<audio id="croak" src="croak.mp3" loop preload="auto"></audio>
+<audio id="hand" src="hand.mp3" preload="auto"></audio>
+<audio id="senengeon" src="senengeon.mp3" loop preload="auto"></audio>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const stage = $('#stage'), music = $('#music'), blackout = $('#blackout');
+
+  /* ---------- saved settings ---------- */
+  const DEF = { vol: 70, music: true, sfx: true, bri: 100 };
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem('etp_' + k); return v === null ? d : JSON.parse(v); } catch(e){ return d; } },
+    set(k, v){ try { localStorage.setItem('etp_' + k, JSON.stringify(v)); } catch(e){} }
+  };
+  const S = {}; for (const k in DEF) S[k] = store.get(k, DEF[k]);
+
+  // iPhones ignore audio.volume — detect it so the slider can say so
+  const volOK = (() => { try { const a = document.createElement('audio'); a.volume = .5; return Math.abs(a.volume - .5) < .01; } catch(e){ return false; } })();
+
+  /* ---------- wobbly title letters ---------- */
+  document.querySelectorAll('.wobble').forEach((el, w) => {
+    const txt = el.textContent; el.textContent = '';
+    const rot = [-5, 3, -2, 5, -4, 2, -3, 4], off = [0, -.03, .02, -.01, .03, -.02, .01, -.03];
+    let i = 0;
+    for (const ch of txt) {
+      if (ch === ' ') { el.appendChild(document.createTextNode(' ')); continue; }
+      const s = document.createElement('span');
+      s.textContent = ch; s.setAttribute('aria-hidden', 'true');
+      s.style.setProperty('--r', rot[(i + w * 3) % 8] + 'deg');
+      s.style.setProperty('--y', off[(i + w * 3) % 8] + 'em');
+      s.style.setProperty('--d', (i * .14 + w * .5) + 's');
+      el.appendChild(s); i++;
+    }
+  });
+
+  /* ---------- little UI sounds (synthesised) ---------- */
+  let ac = null;
+  function getAC(){
+    if (!ac) { try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) ac = new AC(); } catch(e){} }
+    if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
+    return ac;
+  }
+  function tone(type, f1, f2, dur, vol, delay = 0){
+    const c = getAC(); if (!c) return;
+    const t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + .02);
+  }
+  function sfx(kind){
+    if (!S.sfx) return;
+    try {
+      if (kind === 'hover') tone('triangle', 900, 640, .06, .035);
+      if (kind === 'select') { tone('sine', 240, 70, .22, .28); tone('triangle', 1200, 900, .05, .04); }
+      if (kind === 'back') tone('sine', 170, 95, .18, .22);
+      if (kind === 'locked') { tone('square', 110, 92, .1, .05); tone('square', 104, 86, .12, .05, .12); }
+      if (kind === 'tick') tone('triangle', 1400, 1100, .03, .025);
+    } catch(e){}
+  }
+
+  /* ---------- music ---------- */
+  let fade = 0, started = false;
+  function applyMusic(){
+    music.muted = !S.music;
+    if (volOK) music.volume = Math.max(0, Math.min(1, (S.vol / 100) * fade));
+  }
+  function fadeIn(ms){
+    if (!volOK) { fade = 1; applyMusic(); return; }
+    const t0 = performance.now();
+    const step = now => { fade = Math.min(1, Math.max(0, (now - t0) / ms)); applyMusic(); if (fade < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  function playMusic(){ const p = music.play(); if (p && p.catch) p.catch(() => {}); }
+  let inChapter = false, wasPlaying = [];
+  document.addEventListener('visibilitychange', () => {
+    if (!started) return;
+    const els = [...document.querySelectorAll('audio')];
+    if (document.hidden) { wasPlaying = els.filter(a => !a.paused); els.forEach(a => a.pause()); }
+    else if (inChapter) { wasPlaying.forEach(a => a.play().catch(() => {})); }
+    else if (S.music) playMusic();
+  });
+
+  /* ---------- intro: black screen -> photo + music ---------- */
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const img = new Image(); img.src = 'bg.jpg';
+
+  async function begin(){
+    if (started) return; started = true;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
+    getAC();
+    fade = 0; applyMusic(); playMusic();   // must start inside the tap so phones allow it
+    blackout.classList.add('tapped');
+    await wait(700);
+    stage.classList.add('revealed');
+    blackout.classList.add('gone');
+    fadeIn(3500);
+    await wait(2600); stage.classList.add('title-in');
+    await wait(1200); stage.classList.add('menu-in');
+  }
+  blackout.addEventListener('click', begin);
+  blackout.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); begin(); } });
+  blackout.focus({ preventScroll: true });
+
+  /* ---------- screen switching ---------- */
+  function show(name){
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
+    stage.dataset.screen = name;
+    const first = document.querySelector('#' + name + ' .card, #' + name + ' input, #' + name + ' .menu-btn');
+    if (first && document.activeElement && document.activeElement !== document.body && document.activeElement.matches(':focus-visible')) first.focus({ preventScroll: true });
+  }
+  document.querySelectorAll('[data-go]').forEach(b => {
+    b.addEventListener('click', () => { sfx(b.dataset.go === 'menu' ? 'back' : 'select'); show(b.dataset.go); });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (inChapter) { exitChapter(); return; }
+    if (stage.dataset.screen !== 'menu') { sfx('back'); show('menu'); }
+  });
+  document.querySelectorAll('.menu-btn, .back, .card:not(.locked), .toggle').forEach(b => {
+    b.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') sfx('hover'); });
+  });
+
+  /* ---------- Chapter 1 ---------- */
+  const MINES_ENV = '555455434434555654425432222222221222232333334433333343339976897677656544434345224445342242345544443122242';
+  const BUCKLE_ENV = '55447546667434676677533334433346456566444776544577646556778987534355667654433333434456556556888745334';
+  const VOICE_ENV = '11697753146522376653344433311110364111253455323311755469754211111111111111111111111111152221111166577733433545556211256436542355634875321114544432234187564135663215767766445665774243111565332256456752211111111111111111111111113474346776453553111156564233145453235134444443111111111111115877765433432';
+  const voice = $('#voice'), fadeEl = $('#fade'), sceneEl = $('#scene'), sceneMsg = $('#sceneMsg'), sceneBack = $('#sceneBack'), sceneHint = $('#sceneHint');
+  let scene = null, assetsP = null, leaving = false;
+  function loadScript(src, ready){ return new Promise((res, rej) => { if (ready()) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { s.remove(); rej(new Error('script')); }; document.head.appendChild(s); }); }
+  function loadChapterAssets(){
+    if (!assetsP) {
+      assetsP = Promise.all([
+        loadScript('givanium-data.js', () => !!window.GIVANIUM_DATA),
+        loadScript('chapter1.js', () => !!window.Chapter1)
+      ]).then(() => {
+        const d = window.GIVANIUM_DATA, raw = atob(d.b64), bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        return { meta: d.meta, bin: bytes.buffer };
+      });
+      assetsP.catch(() => { assetsP = null; });
+    }
+    return assetsP;
+  }
+  function fadeMusicOut(ms){
+    if (!volOK) return;
+    const t0 = performance.now(), from = fade;
+    const step = now => { fade = Math.max(0, from * (1 - (now - t0) / ms)); applyMusic(); if (fade > 0 && inChapter) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  function sceneMessage(text, btnLabel, onBtn){
+    sceneMsg.innerHTML = '';
+    if (!text) { sceneMsg.classList.remove('show'); return; }
+    const p = document.createElement('div'); p.textContent = text; sceneMsg.appendChild(p);
+    if (btnLabel) { const b = document.createElement('button'); b.textContent = btnLabel; b.addEventListener('click', onBtn); sceneMsg.appendChild(b); }
+    sceneMsg.classList.add('show');
+  }
+  const HAND_ENV = '666698988432222455853357643358564544355554334544444679785557757655776985556786652333333';
+  let c2P = null;
+  function loadChapter2Assets(){
+    if (!c2P) { c2P = Promise.all([loadScript('banban-data.js', () => !!window.BANBAN_DATA), loadScript('chapter2.js', () => !!window.Chapter2)]); c2P.catch(() => { c2P = null; }); }
+    return c2P;
+  }
+  let c3P = null;
+  function loadChapter3Assets(){
+    if (!c3P) { c3P = Promise.all([loadScript('mimicker-data.js', () => !!window.MIMICKER_DATA), loadScript('chapter3.js', () => !!window.Chapter3)]); c3P.catch(() => { c3P = null; }); }
+    return c3P;
+  }
+  const SLEEPER_VARS = { kabob: 'KABOB_DATA', bitter: 'BITTER_DATA', josh: 'JOSH_DATA', dadadoo: 'DADADOO_DATA' };
+  const CREDITS = {
+    3: 'Models: <a href="https://sketchfab.com/3d-models/miss-mimickergarten-of-banban-8-anti-devil-8e6c423cf1544c56b24576c3320d7f83" target="_blank" rel="noopener">\u201cMiss Mimicker/Garten of Banban 8 (Anti Devil)\u201d</a> by Elite Big Speakerman \u00b7 <a href="https://sketchfab.com/3d-models/mr-kabob-man-mech-rigged-a80092172615427e8d53b846b6d4969d" target="_blank" rel="noopener">\u201cMr. Kabob Man Mech Rigged\u201d</a> by Unschooling with Fin \u00b7 <a href="https://sketchfab.com/3d-models/garten-of-banban-7-naughtified-bittergiggle-21163350ad6441748b3096e750b2af19" target="_blank" rel="noopener">\u201cNaughtified Bittergiggle\u201d</a>, <a href="https://sketchfab.com/3d-models/garten-of-banban-2-jumbo-josh-3824c80d07e44751a7f0ec9ce72f53ca" target="_blank" rel="noopener">\u201cJumbo Josh\u201d</a> and <a href="https://sketchfab.com/3d-models/sir-dadadoo-garten-of-banban-6-fanmade-anims-da36c7d3e91d41638c1ee11c6d28e061" target="_blank" rel="noopener">\u201cSir Dadadoo\u201d</a> by nnneagu (simplified &amp; animated) \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>',
+    1: $('#credit1').innerHTML,
+    2: 'Models: <a href="https://sketchfab.com/3d-models/hellish-banban-rigged-c65f6cbd26d24ac6a11511bca18cab83" target="_blank" rel="noopener">\u201cHellish Banban Rigged\u201d</a> and <a href="https://sketchfab.com/3d-models/sheriff-toadster-rigged-official-297ae0f93278413298f4f8c5b8811dbd" target="_blank" rel="noopener">\u201cSheriff Toadster Rigged Official\u201d</a> by nnneagu (simplified &amp; animated) \u00b7 <a href="https://sketchfab.com/3d-models/garten-of-banban-7-syringeon-5ff243faee14410888f72bd646ae5d75" target="_blank" rel="noopener">\u201cGarten of Banban 7 - Syringeon\u201d</a> and <a href="https://sketchfab.com/3d-models/naughtyones-garten-of-banban-6-fanmade-anims-f0c4120365064f2fad9935234f8a4d92" target="_blank" rel="noopener">\u201cNaughtyOnes - Garten of Banban 6\u201d</a> by nnneagu (simplified) \u00b7 <a href="https://sketchfab.com/3d-models/rope-knots-aa6380f3e5d442b1a1971d4cb1c88ccb" target="_blank" rel="noopener">\u201cRope Knots\u201d</a> by aneeqayounas \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>'
+  };
+  async function enterChapter1(){ return enterChapter(1); }
+  async function enterChapter(n){
+    if (inChapter) return;
+    inChapter = true; leaving = false; mpSetChapter(n);
+    $('#credit1').innerHTML = CREDITS[n];
+    // unlock the chapter's sounds inside this tap so they may play later on phones
+    const unlock = n === 1 ? [voice, $('#borrowed'), $('#ride'), $('#buckle'), $('#mines')] : n === 2 ? [$('#croak'), $('#hand'), $('#senengeon')] : [$('#borrowed')];
+    for (const el of unlock) {
+      try { const p = el.play(); el.pause(); el.currentTime = 0; if (p && p.catch) p.catch(() => {}); } catch (e) {}
+    }
+    // phones only let a page speak after a tap: say nothing now so Syringeon can talk later
+    if (n === 2) try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
+    const assets = n === 1 ? loadChapterAssets() : n === 2 ? loadChapter2Assets() : loadChapter3Assets();
+    fadeEl.classList.remove('slow'); fadeEl.classList.add('on');
+    fadeMusicOut(1100);
+    await wait(1300);
+    if (leaving) return;
+    music.pause();
+    stage.style.visibility = 'hidden';
+    sceneEl.classList.add('on'); sceneBack.classList.remove('done'); sceneMessage('');
+    const slow = setTimeout(() => fadeEl.classList.add('loading'), 600);
+    let data;
+    try { data = await assets; } catch (e) {
+      clearTimeout(slow); fadeEl.classList.remove('loading');
+      sceneMessage('Chapter ' + n + ' could not load', 'Back to menu', exitChapter); fadeEl.classList.remove('on'); return;
+    }
+    clearTimeout(slow); fadeEl.classList.remove('loading');
+    if (leaving) return;
+    const canvas = document.createElement('canvas'); sceneEl.prepend(canvas);
+    try {
+      if (n === 3) scene = await window.Chapter3.start({
+        canvas, container: sceneEl, mimicker: window.MIMICKER_DATA, getSleeper: k => window[SLEEPER_VARS[k]] || null,
+        audio: { borrowed: $('#borrowed') }, musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music, mp: mpLink(3),
+        getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(3)
+      });
+      else if (n === 2) scene = await window.Chapter2.start({
+        canvas, container: sceneEl, banban: window.BANBAN_DATA, getToad: () => window.TOAD_DATA || null,
+        audio: { croak: $('#croak'), hand: $('#hand'), seneng: $('#senengeon') }, envHand: HAND_ENV, mp: mpLink(2),
+        getSyr: () => window.SYRINGEON_DATA || null, getNaughty: () => window.NAUGHTY_DATA || null, getRope: () => window.ROPE_DATA || null,
+        musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music, canDuck: () => volOK,
+        getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(2)
+      });
+      else scene = await window.Chapter1.start({
+        canvas, container: sceneEl, meta: data.meta, bin: data.bin, envelope: VOICE_ENV, envBuckle: BUCKLE_ENV, envMines: MINES_ENV,
+        audio: { voice, borrowed: $('#borrowed'), buckle: $('#buckle'), mines: $('#mines'), ride: $('#ride'), wheels: music },
+        getClaw: () => window.CLAW_DATA || null, mp: mpLink(1),
+        musicVol: () => volOK ? S.vol / 100 : 1, musicOn: () => S.music,
+        getAC, sfxOn: () => S.sfx, onExit: exitChapter, onComplete: () => chapterDone(1),
+        onVoiceBlocked: () => sceneMessage('Tap to hear it', '🔊 Play', () => { sceneMessage(''); voice.play().catch(() => {}); }),
+      });
+    } catch (e) {
+      canvas.remove();
+      sceneMessage('Your device could not start the 3D scene', 'Back to menu', exitChapter); fadeEl.classList.remove('on'); return;
+    }
+    if (n === 1) loadScript('claw-data.js', () => !!window.CLAW_DATA).catch(() => {});
+    else if (n === 3) ['kabob', 'bitter', 'josh', 'dadadoo'].reduce((pr, k) => pr.then(() => loadScript(k + '-data.js', () => !!window[SLEEPER_VARS[k]])).catch(() => {}), Promise.resolve());
+    else loadScript('toad-data.js', () => !!window.TOAD_DATA).catch(() => {})
+      .then(() => loadScript('rope-data.js', () => !!window.ROPE_DATA)).catch(() => {})
+      .then(() => loadScript('naughty-data.js', () => !!window.NAUGHTY_DATA)).catch(() => {})
+      .then(() => loadScript('syringeon-data.js', () => !!window.SYRINGEON_DATA)).catch(() => {});
+    await wait(900);
+    if (leaving) return;
+    fadeEl.classList.add('slow'); fadeEl.classList.remove('on');
+    setTimeout(() => sceneHint.classList.add('show'), 2600);
+    setTimeout(() => sceneHint.classList.remove('show'), 7600);
+  }
+  async function exitChapter(){
+    if (!inChapter || leaving) return;
+    leaving = true; sfx('back');
+    fadeEl.classList.remove('slow'); fadeEl.classList.add('on');
+    await wait(1250);
+    if (scene) { scene.stop(); scene = null; }
+    // the ride track is Wheels of Freedom with the driver's line on top: hand over to the menu music at the same spot
+    const ride = $('#ride'), ridePos = ride.paused ? -1 : ride.currentTime;
+    for (const el of [voice, $('#borrowed'), $('#buckle'), $('#mines'), ride, $('#croak'), $('#hand'), $('#senengeon')]) { try { el.pause(); el.currentTime = 0; } catch (e) {} }
+    try { speechSynthesis.cancel(); } catch (e) {}
+    if (ridePos >= 0 && S.music) { try { music.currentTime = ridePos; } catch (e) {} fade = 1; applyMusic(); playMusic(); }
+    sceneEl.querySelectorAll('canvas').forEach(c => c.remove());
+    sceneEl.classList.remove('on'); sceneHint.classList.remove('show'); sceneMessage('');
+    stage.style.visibility = '';
+    inChapter = false; mpSetChapter(0);
+    show('menu');
+    if (!music.paused) { fade = 1; applyMusic(); }          // Wheels of Freedom is already playing from the ride
+    else if (S.music) { fade = 0; applyMusic(); playMusic(); fadeIn(2500); }
+    fadeEl.classList.add('slow'); fadeEl.classList.remove('on');
+    leaving = false;
+  }
+  sceneBack.addEventListener('click', exitChapter);
+
+  const ch1 = $('#ch1');
+  ch1.addEventListener('click', () => { sfx('select'); ch1.classList.remove('pressed'); void ch1.offsetWidth; ch1.classList.add('pressed'); enterChapter1(); });
+  // start downloading Chapter 1 as soon as the chapter list opens
+  document.querySelector('[data-go="chapters"]').addEventListener('click', () => { loadChapterAssets().catch(() => {}); });
+  const ch2 = $('#ch2');
+  const ch3 = $('#ch3');
+  const PROG = { done1: !!store.get('done1', false), done2: !!store.get('done2', false), done3: !!store.get('done3', false) };
+  function refreshLocks(){
+    for (const [card, n] of [[ch2, 2], [ch3, 3]]) {
+      const locked = !PROG['done' + (n - 1)];
+      card.classList.toggle('locked', locked);
+      card.setAttribute('aria-disabled', locked ? 'true' : 'false');
+      card.setAttribute('aria-label', locked ? 'Chapter ' + n + ', locked until you finish Chapter ' + (n - 1) : 'Chapter ' + n);
+    }
+  }
+  function chapterDone(n){ PROG['done' + n] = true; store.set('done' + n, true); refreshLocks(); }
+  function lockedShake(card){ sfx('locked'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); }
+  refreshLocks();
+  ch2.addEventListener('click', () => {
+    if (ch2.classList.contains('locked')) { lockedShake(ch2); return; }
+    sfx('select'); ch2.classList.remove('pressed'); void ch2.offsetWidth; ch2.classList.add('pressed'); enterChapter(2);
+  });
+  ch3.addEventListener('click', () => {
+    if (ch3.classList.contains('locked')) { lockedShake(ch3); return; }
+    sfx('select'); ch3.classList.remove('pressed'); void ch3.offsetWidth; ch3.classList.add('pressed'); enterChapter(3);
+  });
+  document.querySelectorAll('.card[data-ch]').forEach(c => c.addEventListener('click', () => lockedShake(c)));
+
+  /* ---------- multiplayer: a named room per code, players share where they are via presence ---------- */
+  const ART_URL = 'https://claude.ai/artifact/3ZKAVf1QdznvuedoTvYBHn';
+  // On its own website the game uses Firebase for multiplayer; the deploy step fills this in.
+  const FIREBASE_CONFIG = null; /*FIREBASE_CONFIG*/
+  const ON_CLAUDE = /claude|anthropic/.test(location.hostname);
+  const SITE_URL = (!ON_CLAUDE && /^https?:$/.test(location.protocol)) ? location.origin + location.pathname : ART_URL;
+  const COLOR_NAMES = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange'];
+  const mpEl = { link: $('#mpLink'), copy: $('#mpCopy'), gen: $('#mpGen'), join: $('#mpJoin'), follow: $('#mpFollow'), status: $('#mpStatus') };
+  const MP = { room: null, user: null, tried: false, named: null, code: null, others: [], names: {}, me: { ch: 0 }, last: null, lastT: 0, color: Math.floor(Math.random() * 6), current: 0 };
+  const codeOf = text => { const m = String(text || '').toLowerCase().match(/(?:#mp-|\b)([a-z0-9]{6})\b/); return m ? m[1] : null; };
+  const linkFor = code => (FIREBASE_CONFIG ? SITE_URL : ART_URL) + '#mp-' + code;
+  function mpStatus(html){ mpEl.status.innerHTML = html; }
+  // ---- Firebase transport: rooms/<name>/players/<id> = that player's state; removed when they leave ----
+  let fbP = null;
+  function loadFirebase(){
+    if (window.firebase && window.firebase.database) return Promise.resolve(window.firebase);
+    if (!fbP) {
+      const V = '10.12.2';
+      fbP = loadScript('https://www.gstatic.com/firebasejs/' + V + '/firebase-app-compat.js', () => !!window.firebase)
+        .then(() => loadScript('https://www.gstatic.com/firebasejs/' + V + '/firebase-database-compat.js', () => !!(window.firebase && window.firebase.database)))
+        .then(() => window.firebase);
+      fbP.catch(() => { fbP = null; });
+    }
+    return fbP;
+  }
+  function firebaseRoom(fb){
+    if (!fb.apps.length) fb.initializeApp(FIREBASE_CONFIG);
+    const db = fb.database(); let offset = 0;
+    try { db.ref('.info/serverTimeOffset').on('value', s => { offset = s.val() || 0; }); } catch (e) {}
+    const pid = Math.random().toString(36).slice(2, 12);
+    return {
+      async join(name){
+        const ref = db.ref('rooms/' + name + '/players'), meRef = ref.child(pid);
+        let mine = {}, subs = [], errCbs = [], peers = [], hb = 0, writeT = 0, queued = false, left = false;
+        try { await meRef.onDisconnect().remove(); } catch (e) {}
+        const write = () => { if (left) return; writeT = Date.now(); queued = false; meRef.set(Object.assign({}, mine, { ts: fb.database.ServerValue.TIMESTAMP })).catch(() => {}); };
+        const onValue = snap => {
+          const now = Date.now() + offset, all = snap.val() || {};
+          peers = Object.keys(all).filter(k => k === pid || !all[k].ts || now - all[k].ts < 25000).map(k => ({ peer: k, by: null, isMe: k === pid, sameTab: k === pid, kind: 'viewer', guest: false, presence: all[k] }));
+          for (const f of subs) f({ peers, joined: [], left: [], updated: [] });
+        };
+        ref.on('value', onValue, err => { for (const e of errCbs) e({ code: 'upstream_error', message: String(err && err.message || err) }); });
+        hb = setInterval(write, 6000);
+        return {
+          name,
+          presence(patch){
+            for (const k in patch) { if (patch[k] === null) delete mine[k]; else mine[k] = patch[k]; }
+            const gap = Date.now() - writeT;
+            if (gap >= 90) write(); else if (!queued) { queued = true; setTimeout(write, 90 - gap); }
+            return Promise.resolve();
+          },
+          onPeers(fn, onErr){ subs.push(fn); if (onErr) errCbs.push(onErr); setTimeout(() => fn({ peers, joined: peers, left: [], updated: [] }), 0); return () => { subs = subs.filter(f => f !== fn); }; },
+          peers: () => peers,
+          async leave(){ left = true; clearInterval(hb); ref.off('value', onValue); try { await meRef.remove(); } catch (e) {} }
+        };
+      }
+    };
+  }
+  function mpConnect(){
+    if (MP.room) return Promise.resolve(MP.room);
+    return (async () => {
+      if (FIREBASE_CONFIG) {
+        try { MP.room = firebaseRoom(await loadFirebase()); MP.via = 'firebase'; } catch (e) { MP.room = null; MP.why = 'firebase-load'; }
+        return MP.room;
+      }
+      // on claude.ai: the page's own room capability (only for signed-in, invited viewers)
+      for (let i = 0; i < 25 && !(window.claude && window.claude.use); i++) await wait(200);
+      if (!(window.claude && window.claude.use)) { MP.why = 'no-runtime'; return null; }
+      try { MP.user = await window.claude.use('user'); } catch (e) { MP.user = null; }
+      try { MP.room = await window.claude.use('room'); } catch (e) { MP.room = null; }
+      if (!MP.room) MP.why = 'room-unavailable'; else MP.via = 'claude';
+      return MP.room;
+    })();
+  }
+  function nameOf(peer, i){
+    const q = peer.presence || {};
+    const n = (peer.by && MP.names[peer.by]) || (typeof q.nm === 'string' && q.nm.slice(0, 24));
+    return n || ('Player ' + (i + 2));
+  }
+  async function resolveNames(){
+    if (!MP.user || !MP.user.profiles) return;
+    const ids = MP.others.map(p => p.by).filter(id => id && !(id in MP.names));
+    if (!ids.length) return;
+    try { const ps = await MP.user.profiles(ids); for (const id of ids) MP.names[id] = (ps && ps[id] && ps[id].name) || ''; renderMp(); } catch (e) {}
+  }
+  function renderMp(){
+    if (!MP.named) { mpEl.follow.hidden = true; return; }
+    const list = MP.others.map((p, i) => '<b>' + escapeHtml(nameOf(p, i)) + '</b>' + (p.presence && p.presence.ch ? ' (Chapter ' + (+p.presence.ch) + ')' : ' (menu)'));
+    mpStatus('Room <b>' + MP.code.toUpperCase() + '</b> · ' + (list.length ? 'with ' + list.join(', ') : 'waiting for your friend to open the link…'));
+    // offer to follow a friend into the chapter they are playing
+    const f = !inChapter && MP.others.find(p => p.presence && +p.presence.ch >= 1 && +p.presence.ch <= 3);
+    if (f) { const i = MP.others.indexOf(f); mpEl.follow.hidden = false; mpEl.follow.textContent = 'JOIN ' + nameOf(f, i).toUpperCase() + ' IN CHAPTER ' + (+f.presence.ch); mpEl.follow.dataset.ch = +f.presence.ch; }
+    else mpEl.follow.hidden = true;
+  }
+  function escapeHtml(t){ return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+  async function mpJoin(code){
+    mpStatus('Connecting…');
+    const room = await mpConnect();
+    if (!room) { mpStatus(MP.why === 'firebase-load' ? 'Couldn\u2019t reach the multiplayer server. Check your internet and try again.' : 'Multiplayer isn\u2019t available on this copy of the game (' + (MP.why || 'offline') + ').'); return false; }
+    try {
+      if (MP.named) { try { await MP.named.leave(); } catch (e) {} MP.named = null; }
+      MP.named = await room.join('etp-' + code); MP.code = code; MP.others = [];
+      MP.named.onPeers(ch => { MP.others = ch.peers.filter(p => !p.isMe && p.kind === 'viewer'); renderMp(); resolveNames(); }, () => { MP.named = null; mpStatus('Lost the connection to the room. Generate or join again.'); });
+      mpEl.link.value = linkFor(code); mpEl.copy.hidden = false; mpEl.join.hidden = true;
+      try { history.replaceState(null, '', '#mp-' + code); } catch (e) { try { location.hash = 'mp-' + code; } catch (e2) {} }
+      MP.last = null; mpPresence({ ch: MP.current, a: 0, p: null, dead: 0 }); renderMp();
+      return true;
+    } catch (e) {
+      MP.named = null;
+      mpStatus(e && e.code === 'not_permitted' ? 'This account can’t use multiplayer rooms here.' : 'Couldn’t join the room right now. Try again in a moment.');
+      return false;
+    }
+  }
+  function mpPresence(patch){
+    if (!MP.named) return;
+    MP.named.presence(Object.assign({ v: 1, c: MP.color, nm: COLOR_NAMES[MP.color] + ' Explorer' }, patch)).catch(() => {});
+  }
+  // the link handed to each chapter: report where you are, hear where your friends are
+  function mpLink(n){
+    return {
+      report(eye, yaw, area, crouch, dead){
+        if (!MP.named) return;
+        const now = performance.now(); if (now - MP.lastT < 90) return;
+        const s = { ch: n, a: area || 1, p: [+eye[0].toFixed(2), +eye[1].toFixed(2), +eye[2].toFixed(2)], y: +yaw.toFixed(2), cr: crouch ? 1 : 0, dead: dead ? 1 : 0 };
+        const L = MP.last;
+        if (L && L.a === s.a && L.cr === s.cr && L.dead === s.dead && Math.abs(L.p[0] - s.p[0]) < .02 && Math.abs(L.p[1] - s.p[1]) < .02 && Math.abs(L.p[2] - s.p[2]) < .02 && Math.abs(L.y - s.y) < .02 && now - MP.lastT < 2000) return;
+        MP.last = s; MP.lastT = now; mpPresence(s);
+      },
+      peers(){
+        if (!MP.named) return [];
+        const out = [];
+        MP.others.forEach((p, i) => {
+          const q = p.presence || {};
+          if (+q.ch !== n || !Array.isArray(q.p) || q.p.length !== 3) return;
+          const [x, y, z] = q.p.map(Number); if (![x, y, z].every(isFinite)) return;
+          out.push({ key: p.peer, name: nameOf(p, i), color: (+q.c || 0) % 6, area: +q.a || 1, x, y, z, yw: +q.y || 0, crouch: !!q.cr, dead: !!q.dead });
+        });
+        return out;
+      }
+    };
+  }
+  function mpSetChapter(n){ MP.current = n; MP.last = null; mpPresence({ ch: n, p: null, dead: 0 }); renderMp(); }
+  mpEl.gen.addEventListener('click', async () => {
+    sfx('select');
+    const abc = 'abcdefghjkmnpqrstuvwxyz23456789'; let code = '';
+    const r = new Uint32Array(6); try { crypto.getRandomValues(r); } catch (e) { for (let i = 0; i < 6; i++) r[i] = Math.random() * 1e9; }
+    for (let i = 0; i < 6; i++) code += abc[r[i] % abc.length];
+    mpEl.link.value = linkFor(code); mpEl.copy.hidden = false;
+    await mpJoin(code);
+  });
+  mpEl.copy.addEventListener('click', async () => {
+    const text = mpEl.link.value; let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {}
+    if (!ok) { try { mpEl.link.focus(); mpEl.link.select(); ok = document.execCommand && document.execCommand('copy'); } catch (e) {} }
+    mpEl.copy.textContent = ok ? 'COPIED!' : 'SELECT & COPY'; sfx(ok ? 'select' : 'locked');
+    setTimeout(() => { mpEl.copy.textContent = 'COPY'; }, 1600);
+  });
+  mpEl.link.addEventListener('input', () => {
+    const c = codeOf(mpEl.link.value);
+    mpEl.join.hidden = !c || c === MP.code; mpEl.copy.hidden = !(MP.code && mpEl.link.value === linkFor(MP.code));
+  });
+  mpEl.link.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const c = codeOf(mpEl.link.value); if (c) mpJoin(c); } });
+  mpEl.join.addEventListener('click', () => { const c = codeOf(mpEl.link.value); if (c) { sfx('select'); mpJoin(c); } });
+  mpEl.follow.addEventListener('click', () => { const n = +mpEl.follow.dataset.ch; if (n >= 1 && n <= 3 && !inChapter) { sfx('select'); enterChapter(n); } });
+  // opened from a friend's link (#mp-xxxxxx): join their room straight away
+  { const c = /^#mp-([a-z0-9]{6})$/.test(location.hash) ? location.hash.slice(4) : null; if (c) { mpEl.link.value = linkFor(c); mpJoin(c); } }
+
+  /* ---------- settings ---------- */
+  const vol = $('#vol'), volOut = $('#volOut'), bri = $('#bri'), briOut = $('#briOut');
+  const musicT = $('#musicT'), sfxT = $('#sfxT');
+  if (!volOK) {
+    $('#volRow .ctl').outerHTML = '<span class="note">Use your phone’s volume buttons</span>';
+  }
+  function fillRange(r){ r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min) * 100) + '%'); }
+  function setToggle(btn, on){ btn.setAttribute('aria-pressed', on ? 'true' : 'false'); btn.textContent = on ? 'ON' : 'OFF'; }
+  function render(){
+    if (volOK) { vol.value = S.vol; volOut.textContent = S.vol; fillRange(vol); }
+    bri.value = S.bri; briOut.textContent = S.bri; fillRange(bri);
+    setToggle(musicT, S.music); setToggle(sfxT, S.sfx);
+    stage.style.setProperty('--b', S.bri / 100);
+    applyMusic();
+  }
+  function save(){ for (const k in S) store.set(k, S[k]); }
+
+  if (volOK) vol.addEventListener('input', () => { S.vol = +vol.value; render(); save(); });
+  bri.addEventListener('input', () => { S.bri = +bri.value; render(); save(); });
+  musicT.addEventListener('click', () => {
+    S.music = !S.music; render(); save(); sfx('tick');
+    if (S.music && started) playMusic();
+  });
+  sfxT.addEventListener('click', () => { S.sfx = !S.sfx; render(); save(); sfx('tick'); });
+  $('#reset').addEventListener('click', () => {
+    Object.assign(S, DEF); render(); save(); sfx('tick');
+    if (started) playMusic();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
