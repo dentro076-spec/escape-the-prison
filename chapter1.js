@@ -792,6 +792,35 @@
   }
 
   /* ================= audio (Web Audio extras) ================= */
+  // on a computer: click the game to lock the mouse and look around by moving it; Esc lets go
+  function makeMouseLock(canvas, hud, onLook) {
+    const tip = document.createElement('div'); tip.className = 'c1-lock'; tip.textContent = 'Click to lock the mouse \u00b7 Esc to unlock';
+    const cross = document.createElement('div'); cross.className = 'c1-cross';
+    hud.root.appendChild(tip); hud.root.appendChild(cross);
+    const fine = !!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches);
+    if (!fine || !canvas.requestPointerLock) return { update() {}, stop() { tip.remove(); cross.remove(); } };
+    const locked = () => document.pointerLockElement === canvas;
+    const canLock = () => !hud.dead.classList.contains('show') && !hud.end.classList.contains('show');   // buttons to press: let the mouse go
+    const lock = () => {
+      try { const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => { try { canvas.requestPointerLock(); } catch (e) {} }); }
+      catch (e) { try { canvas.requestPointerLock(); } catch (e2) {} }
+    };
+    const onClick = e => { if (e.pointerType && e.pointerType !== 'mouse') return; if (!locked() && canLock()) lock(); };
+    const onMove = e => { if (locked()) onLook(e.movementX || 0, e.movementY || 0); };
+    canvas.addEventListener('click', onClick); hud.zone.addEventListener('click', onClick); document.addEventListener('mousemove', onMove);
+    return {
+      update() {
+        const L = locked(), ok = canLock();
+        if (L && !ok) { try { document.exitPointerLock(); } catch (e) {} }
+        tip.classList.toggle('show', !L && ok); cross.classList.toggle('show', L);
+      },
+      stop() {
+        canvas.removeEventListener('click', onClick); hud.zone.removeEventListener('click', onClick); document.removeEventListener('mousemove', onMove);
+        if (locked()) { try { document.exitPointerLock(); } catch (e) {} }
+        tip.remove(); cross.remove();
+      }
+    };
+  }
   function makeAudio(getAC, sfxOn) {
     const ac = getAC && getAC();
     const none = () => {};
@@ -1034,6 +1063,10 @@
   @keyframes c1pulse{50%{opacity:.35}}
   .c1-keys{position:absolute;left:50%;bottom:clamp(14px,3vh,26px);transform:translateX(-50%);font-size:13px;letter-spacing:.25em;text-transform:uppercase;color:#a49a8c;opacity:0;transition:opacity 1s;white-space:nowrap}
   .c1-keys.show{opacity:.7}
+  .c1-lock{position:absolute;left:50%;bottom:clamp(44px,8vh,66px);transform:translateX(-50%);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#e9dcc6;background:rgba(0,0,0,.45);padding:.5em 1em;border-radius:999px;opacity:0;transition:opacity .4s;white-space:nowrap;pointer-events:none}
+  .c1-lock.show{opacity:.85}
+  .c1-cross{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,245,230,.75);box-shadow:0 0 0 1.5px rgba(0,0,0,.45);opacity:0;transition:opacity .2s;pointer-events:none}
+  .c1-cross.show{opacity:1}
   .c1-flash{position:absolute;inset:0;background:#fff;opacity:0}
   .c1-flash.go{animation:c1flash 1.3s ease-out forwards}
   @keyframes c1flash{0%{opacity:1;background:#fff}12%{opacity:.95;background:#ffc070}100%{opacity:0;background:#ff4a10}}
@@ -1634,6 +1667,7 @@
     const onBlur = () => { keys.f = keys.b = keys.l = keys.r = 0; };
     hud.zone.addEventListener('pointerdown', onZoneDown);
     canvas.addEventListener('pointerdown', onCanvasDown);
+    const mouse = makeMouseLock(canvas, hud, (dx, dy) => look(dx * .45, dy * .45));   // computer: locked mouse to look around
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onUp);
     window.addEventListener('keydown', onKey); window.addEventListener('keyup', onKey); window.addEventListener('blur', onBlur);
     onPress(hud.act, onAct);
@@ -2179,6 +2213,7 @@
     function frame(t, noDraw) {
       if (G) { const T = coop.time(t); if (T === null) return; t = T; }
       const dt = clamp(t - st.t, 0, .1); st.t = t;
+      mouse.update();
       if (!noDraw && dt > 0) { emaDt = lerp(emaDt, dt, .05); if (t - lastScaleT > 1.5 && emaDt > .036 && resScale > .55) { resScale *= .85; lastScaleT = t; } }
       if (G) coop.apply(t);
       else for (let n = 0; n < 50; n++) { let k = -1; for (let i = 0; i < st.timers.length; i++) if (t >= st.timers[i].at && (k < 0 || st.timers[i].at < st.timers[k].at)) k = i; if (k < 0) break; const f = st.timers[k].fn; st.timers.splice(k, 1); f(); }   // earliest first, even on a slow frame
@@ -2437,7 +2472,7 @@
         window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp);
         window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey); window.removeEventListener('blur', onBlur);
         for (const el of [A.voice, A.borrowed, A.buckle, A.mines]) if (el) { try { el.pause(); el.onended = null; el.onplaying = null; } catch (e) {} }
-        hud.root.remove(); if (mpAv) mpAv.dispose();
+        mouse.stop(); hud.root.remove(); if (mpAv) mpAv.dispose();
         const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
       },
       state: st, mon, coop, _dbg: { beginFree, enterArea2, enterSewer, takeLight, monSpawn, startCrash, ensureClaw }, _frame: (t, nd) => frame(t, nd),
