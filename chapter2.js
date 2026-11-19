@@ -406,8 +406,9 @@
     const locked = () => document.pointerLockElement === canvas;
     const canLock = () => !hud.dead.classList.contains('show') && !hud.end.classList.contains('show');   // buttons to press: let the mouse go
     const lock = () => {
-      try { const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => { try { canvas.requestPointerLock(); } catch (e) {} }); }
-      catch (e) { try { canvas.requestPointerLock(); } catch (e2) {} }
+      const plain = () => { try { const q = canvas.requestPointerLock(); if (q && q.catch) q.catch(() => {}); } catch (e) {} };
+      try { const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(plain); }
+      catch (e) { plain(); }
     };
     const onClick = e => { if (e.pointerType && e.pointerType !== 'mouse') return; if (!locked() && canLock()) lock(); };
     const onMove = e => { if (locked()) onLook(e.movementX || 0, e.movementY || 0); };
